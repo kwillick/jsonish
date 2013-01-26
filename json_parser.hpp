@@ -3,6 +3,7 @@
 
 #include <deque>
 #include <utility>
+#include <functional>
 #include "json_values.hpp"
 
 namespace json
@@ -10,7 +11,7 @@ namespace json
 
 enum class e_Token
 {
-    LeftBrace,
+    LeftBrace = 0,
     RightBrace,
     LeftBracket,
     RightBracket,
@@ -69,7 +70,7 @@ class Lexer
     const char* m_end;
 
     Token read_string();
-    Token read_number(bool minus);
+    Token read_number();
     Token read_potential_true();
     Token read_potential_false();
     Token read_potential_null();
@@ -78,18 +79,39 @@ class Lexer
 class Parser
 {
   public:
+    struct Error
+    {
+        const char* pos;
+        const char* message;
+    };
+
     Parser() = delete;
 
     Parser(const char* input);
     Parser(const char* start, const char* end);
 
-    Value parse();
+    void reset();
+    void reset(const char* input);
+    void reset(const char* start, const char* end);
+
+    Value parse(std::function<void(const Error&)> error_fun);
 
   private:
+    const char* m_start;
+    const char* m_end;
     Lexer m_lexer;
 
-    typedef std::pair<e_Token, Value> parse_state;
-    std::deque<parse_state> m_stack;
+    std::deque<Value> m_stack;
+
+    unsigned int top_type() const;
+    void push(const Lexer::Token& token);
+    void pop(const Lexer::Token& token);
+    void error(const Lexer::Token& token);
+
+    long long parse_integer(const Lexer::Token& token);
+    double parse_float(const Lexer::Token& token);
+
+    Value done(const Lexer::Token& token);
 };
 
 } //json

@@ -13,10 +13,10 @@ void Value::copy_guts(const Value& o)
     switch (m_type)
     {
     case e_JsonType::object:
-        new (&m_object) Object(o.m_object);
+        m_object = new Object(*o.m_object);
         break;
     case e_JsonType::array:
-        new (&m_array) Array(o.m_array);
+        m_array = new Array(*o.m_array);
         break;
     case e_JsonType::string:
         new (&m_string) String(o.m_string);
@@ -37,10 +37,10 @@ void Value::move_guts(Value&& o)
     switch (m_type)
     {
     case e_JsonType::object:
-        new (&m_object) Object(std::forward<Object>(o.m_object));
+        m_object = new Object(std::forward<Object>(o.m_object));
         break;
     case e_JsonType::array:
-        new (&m_array) Array(std::forward<Array>(o.m_array));
+        m_array = new Array(std::forward<Array>(o.m_array));
         break;
     case e_JsonType::string:
         new (&m_string) String(std::forward<String>(o.m_string));

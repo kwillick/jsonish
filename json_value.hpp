@@ -6,40 +6,23 @@
 #include <memory>
 #include <string>
 
+#include "json_string.hpp"
+
 namespace json
 {
 
-class Value;
-
 enum class e_JsonType
 {
-    object = 0,
-    array,
-    string,
-    integer,
-    floating_point,
-    true_value,
-    false_value,
-    null_value
+    Object = 0,
+    Array,
+    String,
+    Integer,
+    FloatingPoint,
+    True,
+    False,
+    Null
 };
 
-class String
-{
-  public:
-    String(const char* start, const char* end) : m_start(start), m_end(end) { }
-
-    bool operator<(const String& rhs) const
-    { return std::lexicographical_compare(m_start, m_end, rhs.m_start, rhs.m_end); }
-
-    std::string to_string() const { return std::string(m_start, m_end); }
-    
-  private:
-    const char* m_start;
-    const char* m_end;
-};
-
-typedef std::map<String, std::unique_ptr<Value>> Object;
-typedef std::vector<std::unique_ptr<Value>>      Array;
 
 namespace impl
 {
@@ -48,6 +31,12 @@ template <e_JsonType J>
 struct result_type;
 
 } //impl
+
+class Value;
+class Object;
+
+typedef std::vector<Value> Array;
+
 
 class Value
 {
@@ -86,8 +75,8 @@ class Value
     e_JsonType m_type;
     union
     {
-        Object m_object;
-        Array m_array;
+        Object* m_object;
+        Array* m_array;
         String m_string;
         long long m_integer;
         double m_floating_point;
@@ -97,15 +86,15 @@ class Value
     void move_guts(Value&& o);
     
 
-#define GET_IMPL(t, n)                                  \
-    t& get_impl(t*) { return n; }                       \
-    const t& get_impl(const t*) const { return n; }
+#define GET_IMPL(t, n)                                          \
+    inline t& get_impl(t*) { return n; }                        \
+    inline const t& get_impl(const t*) const { return n; }
 
-    GET_IMPL(Object, m_object)
-    GET_IMPL(Array, m_array)
-    GET_IMPL(String, m_string)
+    GET_IMPL(Object,    *m_object)
+    GET_IMPL(Array,     *m_array)
+    GET_IMPL(String,    m_string)
     GET_IMPL(long long, m_integer)
-    GET_IMPL(double, m_floating_point)
+    GET_IMPL(double,    m_floating_point)
 
 #undef GET_IMPL
 };
@@ -116,11 +105,11 @@ namespace impl
 
 #define RESULT_IMPL(e, t) template <> struct result_type<e> { typedef t type; }
 
-RESULT_IMPL(e_JsonType::object,         Object);
-RESULT_IMPL(e_JsonType::array,          Array);
-RESULT_IMPL(e_JsonType::string,         String);
-RESULT_IMPL(e_JsonType::integer,        long long);
-RESULT_IMPL(e_JsonType::floating_point, double);
+RESULT_IMPL(e_JsonType::Object,        Object);
+RESULT_IMPL(e_JsonType::Array,         Array);
+RESULT_IMPL(e_JsonType::String,        String);
+RESULT_IMPL(e_JsonType::Integer,       long long);
+RESULT_IMPL(e_JsonType::FloatingPoint, double);
 
 #undef RESULT_IMPL
 
