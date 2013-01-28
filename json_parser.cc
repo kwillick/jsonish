@@ -7,7 +7,7 @@
 #include <climits>
 #include <iterator>
 
-//TODO: add an internal exception mechanism
+#include "json_object.hpp"
 
 namespace json
 {
@@ -24,7 +24,7 @@ enum class e_LexerError
     Count
 };
 
-static const char* s_lexer_errors[e_LexerError::Count] =
+static const char* s_lexer_errors[static_cast<unsigned>(e_LexerError::Count)] =
 {
     "Unknown Character",
     "Unterminated string",
@@ -97,7 +97,8 @@ Lexer::Token Lexer::next()
             return read_potential_null();
 
         default:
-            return Token(pos, s_lexer_errors[e_LexerError::UnknownCharacters]);
+            return Token(m_pos,
+                         s_lexer_errors[static_cast<unsigned>(e_LexerError::UnknownCharacter)]);
         }
     }
 
@@ -116,7 +117,7 @@ Lexer::Token Lexer::read_string()
         }
     } 
 
-    return Token(start, s_lexer_errors[e_LexerError::UnterminatedString]);
+    return Token(start, s_lexer_errors[static_cast<unsigned>(e_LexerError::UnterminatedString)]);
 }
 
 Lexer::Token Lexer::read_number()
@@ -136,7 +137,7 @@ Lexer::Token Lexer::read_number()
         m_pos++;
     }
 
-    return Token(start, s_lexer_errors[e_LexerError::UnexpectedEnd]);
+    return Token(start, s_lexer_errors[static_cast<unsigned>(e_LexerError::UnexpectedEnd)]);
 }
 
 Lexer::Token Lexer::read_potential_true()
@@ -150,7 +151,7 @@ Lexer::Token Lexer::read_potential_true()
         return Token(e_Token::True, nullptr, nullptr);
     }
 
-    return Token(start, s_lexer_errors[e_LexerError::ExpectedTrue]);
+    return Token(start, s_lexer_errors[static_cast<unsigned>(e_LexerError::ExpectedTrue)]);
 }
 
 Lexer::Token Lexer::read_potential_false()
@@ -165,7 +166,7 @@ Lexer::Token Lexer::read_potential_false()
         return Token(e_Token::False, nullptr, nullptr);
     }
 
-    return Token(start, s_lexer_errors[e_LexerError::ExpectedFalse));
+    return Token(start, s_lexer_errors[static_cast<unsigned>(e_LexerError::ExpectedFalse)]);
 }
 
 Lexer::Token Lexer::read_potential_null()
@@ -179,7 +180,7 @@ Lexer::Token Lexer::read_potential_null()
         return Token(e_Token::Null, nullptr, nullptr);
     }
 
-    return Token(start, s_lexer_errors[e_LexerError::ExpectedNull]);
+    return Token(start, s_lexer_errors[static_cast<unsigned>(e_LexerError::ExpectedNull)]);
 }
 
 Parser::Parser(const char* input) : Parser(input, input + strlen(input) + 1)
@@ -464,7 +465,7 @@ Value Parser::parse(std::function<void(const Parser::Error&)> error_fun)
         while (true)
         {
             auto token = m_lexer.next();
-            const auto& action = s_state_table[token.type][top_type()];
+            const auto& action = s_state_table[static_cast<unsigned int>(token.type)][top_type()];
 
             switch (action)
             {
@@ -490,44 +491,47 @@ unsigned int Parser::top_type() const
         return 0;
     
     const auto& top = m_stack.front();
-    return top.type() + 1;
+    return static_cast<unsigned int>(top.type()) + 1;
 }
 
 void Parser::push(const Lexer::Token& token)
 {
+    //these should be e_Tokens
     switch (token.type)
     {
-    case e_JsonType::Object:
+    case e_Token::LeftBrace:
         m_stack.emplace_front(Object());
         break;
-    case e_JsonType::Array:
+    case e_Token::LeftBracket:
         m_stack.emplace_front(Array());
         break;
-    case e_JsonType::String:
+    case e_Token::String:
         m_stack.emplace_front(String(token.value.start, token.value.end));
         break;
-    case e_JsonType::Integer:
+    case e_Token::Integer:
         m_stack.emplace_front(parse_integer(token));
         break;
-    case e_JsonType::FloatingPoint:
+    case e_Token::Float:
         m_stack.emplace_front(parse_float(token));
         break;
-    case e_JsonType::True:
+    case e_Token::True:
         m_stack.emplace_front(Value(true));
         break;
-    case e_JsonType::False:
+    case e_Token::False:
         m_stack.emplace_front(Value(false));
         break;
-    case e_JsonType::Null:
+    case e_Token::Null:
         m_stack.emplace_front(Value());
         break;
+    default:
+        throw Error(token.value.start, nullptr);
     }
 }
 
 void Parser::pop(const Lexer::Token& token)
 {    
     auto it = m_stack.begin();
-    if (token.type == Lexer::e_Token::RightBracket)
+    if (token.type == e_Token::RightBracket)
     {
         for (; it != m_stack.end(); ++it)
         {
@@ -539,7 +543,7 @@ void Parser::pop(const Lexer::Token& token)
             } 
         }
     }
-    else if (token.type == Lexer::e_Token::RightBrace)
+    else if (token.type == e_Token::RightBrace)
     {
         for (; it != m_stack.end(); ++it)
         {
@@ -567,7 +571,7 @@ void Parser::pop(const Lexer::Token& token)
     else if (it->type() == e_JsonType::Object)
     {
         auto& object = it->get<e_JsonType::Object>();
-        object.assign(move_iter_type(start), move_iter_type(it));
+        object.move_assign(start, it);
     }
 
     m_stack.erase(start, it);
@@ -575,13 +579,16 @@ void Parser::pop(const Lexer::Token& token)
 
 void Parser::error(const Lexer::Token& token)
 {
-    
+    if (token.type == e_Token::Error)
+        throw Error(token.error.pos, token.error.message);
+    else
+        throw Error(token.value.start, nullptr);
 }
 
 long long Parser::parse_integer(const Lexer::Token& token)
 {
     char* endptr = nullptr;
-    long long result = strtoll(token.value.start, &enptr, 10);
+    long long result = strtoll(token.value.start, &endptr, 10);
     if (endptr != token.value.end)
         throw Error(token.value.start, nullptr); //invalid integer
 
@@ -612,7 +619,7 @@ Value Parser::done(const Lexer::Token& token)
     if (m_stack.size() != 1)
         throw Error(token.value.start, nullptr);
 
-    std::move_iterator<decltype(m_stack.begin())> move_it = m_stack.begin();
+    std::move_iterator<decltype(m_stack.begin())> move_it(m_stack.begin());
     Value result(*move_it);
     m_stack.pop_front();
 

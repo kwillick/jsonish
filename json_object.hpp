@@ -14,27 +14,24 @@
 namespace json
 {
 
-//TODO: switch Member to a std::pair
 class Object
 {
+    typedef std::pair<String, Value>            Member;
   public:
-    struct Member
-    {
-        String key;
-        Value value;
-    };
-
     typedef std::vector<Member>::iterator       iterator;
     typedef std::vector<Member>::const_iterator const_iterator;
     
-    Object() { }
-    ~Object() { }
+    Object();
+    ~Object();
 
     template <typename InputIter>
-    void assign(InputIter start, InputIter end);
+    void move_assign(InputIter start, InputIter end);
 
-    Value& operator[](const String& s);
-    const Value& operator[](const String& s) const;
+    Value& operator[](const char* str);
+    const Value& operator[](const char* str) const;
+
+    Value& operator[](const std::string& str);
+    const Value& operator[](const std::string& str) const;
 
     iterator begin()             { return m_pairs.begin(); }
     const_iterator begin() const { return m_pairs.cbegin(); }
@@ -46,45 +43,34 @@ class Object
     std::size_t size() const     { return m_pairs.size(); }
 
   private:
-    std::vector<Member> m_pairs;
+    std::vector<Member> m_pairs; //should I be using a std::map<String, Value> ?
 };
 
 template <typename InputIter>
-void Object::assign(InputIter start, InputIter end)
+void Object::move_assign(InputIter start, InputIter end)
 {
+    static_assert(std::is_same<typename std::iterator_traits<InputIter>::value_type, Value>::value,
+                  "Iterator must have a value_type of json::Value");
+
+    typedef std::move_iterator<InputIter> move_iterator;
+    
     m_pairs.clear();
     
     m_pairs.reserve(std::distance(start, end));
     for (; start != end; ++start)
-        m_pairs.emplace_back({*start++, *start });
+    {
+        move_iterator first(start++);
+        move_iterator second(start);
+
+        Value s(*first);
+        m_pairs.emplace_back(s.take<e_JsonType::String>(), std::forward<Value>(*second));
+    }
 
     std::sort(m_pairs.begin(),
               m_pairs.end(),
               [](const Member& a, const Member& b) -> bool {
-                  return a.key < b.key;
+                  return a.first < b.first;
               });
-}
-
-Value& Object::operator[](const String& s)
-{
-    auto pos = std::lower_bound(m_pairs.begin(),
-                                m_pairs.end(), 
-                                s, 
-                                [](const Member& a, const String& b) -> bool {
-                                    return a.key < b;
-                                });
-    return pos->value;
-}
-
-const Value& Object::operator[](const String& s) const
-{
-    auto pos = std::lower_bound(m_pairs.cbegin(),
-                                m_pairs.cend(), 
-                                s, 
-                                [](const Member& a, const String& b) -> bool {
-                                    return a.key < b;
-                                });
-    return pos->value;
 }
 
 } //json

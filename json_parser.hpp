@@ -4,7 +4,7 @@
 #include <deque>
 #include <utility>
 #include <functional>
-#include "json_values.hpp"
+#include "json_value.hpp"
 
 namespace json
 {
@@ -83,6 +83,7 @@ class Parser
     {
         const char* pos;
         const char* message;
+        Error(const char* p, const char* m) : pos(p), message(m) { }
     };
 
     Parser() = delete;
