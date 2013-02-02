@@ -49,6 +49,8 @@ class Object
 template <typename InputIter>
 void Object::move_assign(InputIter start, InputIter end)
 {
+    //iterator expecst (value, key)
+
     static_assert(std::is_same<typename std::iterator_traits<InputIter>::value_type, Value>::value,
                   "Iterator must have a value_type of json::Value");
 
@@ -62,8 +64,8 @@ void Object::move_assign(InputIter start, InputIter end)
         move_iterator first(start++);
         move_iterator second(start);
 
-        Value s(*first);
-        m_pairs.emplace_back(s.take<e_JsonType::String>(), std::forward<Value>(*second));
+        Value s(*second);
+        m_pairs.emplace_back(s.take<e_JsonType::String>(), std::forward<Value>(*first));
     }
 
     std::sort(m_pairs.begin(),

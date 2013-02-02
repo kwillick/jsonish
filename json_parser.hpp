@@ -76,16 +76,16 @@ class Lexer
     Token read_potential_null();
 };
 
+struct Error
+{
+    const char* pos;
+    const char* message;
+    Error(const char* p, const char* m) : pos(p), message(m) { }
+};
+
 class Parser
 {
   public:
-    struct Error
-    {
-        const char* pos;
-        const char* message;
-        Error(const char* p, const char* m) : pos(p), message(m) { }
-    };
-
     Parser() = delete;
 
     Parser(const char* input);

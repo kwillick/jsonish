@@ -6,8 +6,9 @@
 #include <cerrno>
 #include <climits>
 #include <iterator>
-
 #include "json_object.hpp"
+
+//TODO add actual error messages
 
 namespace json
 {
@@ -108,7 +109,7 @@ Lexer::Token Lexer::next()
 Lexer::Token Lexer::read_string()
 {
     auto start = m_pos;
-    while (m_pos != m_end);
+    while (m_pos != m_end)
     {
         if (*m_pos++ == '"')
         {
@@ -128,7 +129,7 @@ Lexer::Token Lexer::read_number()
     {
         if (*m_pos == '.')
             is_fp = true;
-        else if (!std::isspace(*m_pos))
+        else if (!std::isdigit(*m_pos))
         {
             auto t = is_fp ? e_Token::Float : e_Token::Integer;
             return Token(t, start, m_pos);
@@ -161,7 +162,7 @@ Lexer::Token Lexer::read_potential_false()
     if ((m_pos != m_end) && (*m_pos++ == 'a') &&
         (m_pos != m_end) && (*m_pos++ == 'l') &&
         (m_pos != m_end) && (*m_pos++ == 's') &&
-        (m_pos != m_end) && (*m_end++ == 'e'))
+        (m_pos != m_end) && (*m_pos++ == 'e'))
     {
         return Token(e_Token::False, nullptr, nullptr);
     }
@@ -458,7 +459,7 @@ void Parser::reset(const char* start, const char* end)
     reset();
 }
 
-Value Parser::parse(std::function<void(const Parser::Error&)> error_fun)
+Value Parser::parse(std::function<void(const Error&)> error_fun)
 {
     try
     {
@@ -561,12 +562,17 @@ void Parser::pop(const Lexer::Token& token)
 
     auto start = m_stack.begin();
 
-    typedef std::move_iterator<decltype(it)> move_iter_type;
+    typedef std::move_iterator<decltype(it)>      move_iter_type;
+    typedef std::reverse_iterator<move_iter_type> reverse_iter_type;
     if (it->type() == e_JsonType::Array)
     {
         auto& array = it->get<e_JsonType::Array>();
         array.reserve(std::distance(start, it));
-        array.assign(move_iter_type(start), move_iter_type(it));
+
+        reverse_iter_type rstart{move_iter_type(start)};
+        reverse_iter_type rit{move_iter_type(it)};
+        array.assign(rit, rstart);
+        
     }
     else if (it->type() == e_JsonType::Object)
     {

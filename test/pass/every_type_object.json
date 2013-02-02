@@ -1,0 +1,12 @@
+{
+    "object": {
+        "a": 12
+    },
+    "array": [1,2, "c"],
+    "string": "hi",
+    "integer": 31337,
+    "float": 518.98765,
+    "true": true,
+    "false": false,
+    "null": null
+}
