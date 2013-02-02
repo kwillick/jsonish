@@ -18,8 +18,13 @@ int main(int argc, char *argv[])
     std::string expect(argv[2]);
     bool expect_pass = expect == "pass";
 
-    std::string top(argv[3]);
-    bool toplevel_object = top == "object";
+    std::string top;
+    bool toplevel_object = false;
+    if (expect_pass)
+    {
+        top = argv[3];
+        toplevel_object = top == "object";
+    }
     
     std::cout << "test: " << filename << " expected " << (expect_pass ? "pass" : "fail") << "\n";
 
@@ -38,22 +43,22 @@ int main(int argc, char *argv[])
         {
             if (result.type() != json::e_JsonType::Object)
             {
-                std::cout << "test failed expected top level object\n";
-                return 0;
+                std::cout << "test FAILED expected top level object\n\n";
+                return 1;
             }
 
-            std::cout << "test passed, result:\n";
+            std::cout << "test PASSED, result:\n";
             print_object(result.get<json::e_JsonType::Object>());
         }
         else
         {
             if (result.type() != json::e_JsonType::Array)
             {
-                std::cout << "test failed expected top level array\n";
-                return 0;
+                std::cout << "test FAILED expected top level array\n\n";
+                return 1;
             }
 
-            std::cout << "test passed, result:\n";
+            std::cout << "test PASSED, result:\n";
             print_array(result.get<json::e_JsonType::Array>());
         }
     }
@@ -61,18 +66,22 @@ int main(int argc, char *argv[])
     {
         //unexpected error
         //TODO add actual errors in parser
-        std::cout << "test failed: \n";
+        std::cout << "test FAILED: \n\n";
+        return 1;
     }
     else if (!expect_pass && !parse_error)
     {
         //error was expected but didn't happen
-        std::cout << "test failed: expected parse error\n";
+        std::cout << "test FAILED: expected parse error\n\n";
+        return 1;
     }
     else if (!expect_pass && parse_error)
     {
         //error expected and it happened
-        std::cout << "test passed, expected parse error. Error is: \n";
+        std::cout << "test PASSED, expected parse error. Error is: \n";
     }
+
+    std::cout << std::endl;
     
     return 0;
 }

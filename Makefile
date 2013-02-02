@@ -24,7 +24,6 @@ releasedir:
 
 debug: CXXFLAGS += -g
 debug: $(call PathTransform,SOURCES,debug)
-	$(SHARED_LIB) $(call PathTransform,SOURCES,debug) -o debug/libjsond.dylib
 	$(STATIC_LIB) $(call PathTransform,SOURCES,debug) -o debug/libjsond.a
 
 release: CXXFLAGS += -O4 -flto
