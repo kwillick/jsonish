@@ -5,6 +5,9 @@
 #include <deque>
 #include "../json.hpp"
 
+std::string red(const std::string& s);
+std::string blue(const std::string& s);
+
 std::string read_file(const std::string& filename);
 
 void print_object(const json::Object& object, int indent = 1);
@@ -32,8 +35,10 @@ int main(int argc, char *argv[])
     const char* end = start + text.length();
     json::Parser parser(start, end);
     bool parse_error = false;
-    json::Value result = parser.parse([&parse_error](const json::Error& error)
+    json::Error error;
+    json::Value result = parser.parse([&parse_error,&error](const json::Error& err)
                                       {
+                                          error = err;
                                           parse_error = true;
                                       });
 
@@ -43,47 +48,57 @@ int main(int argc, char *argv[])
         {
             if (result.type() != json::e_JsonType::Object)
             {
-                std::cout << "test FAILED expected top level object\n\n";
+                std::cout << "test " << red("FAILED") << " expected top level object\n\n";
                 return 1;
             }
 
-            std::cout << "test PASSED, result:\n";
+            std::cout << "test " << blue("PASSED") << ", result:\n";
             print_object(result.get<json::e_JsonType::Object>());
         }
         else
         {
             if (result.type() != json::e_JsonType::Array)
             {
-                std::cout << "test FAILED expected top level array\n\n";
+                std::cout << "test " << red("FAILED") << " expected top level array\n\n";
                 return 1;
             }
 
-            std::cout << "test PASSED, result:\n";
+            std::cout << "test " << blue("PASSED") << ", result:\n";
             print_array(result.get<json::e_JsonType::Array>());
         }
     }
     else if (expect_pass && parse_error)
     {
         //unexpected error
-        //TODO add actual errors in parser
-        std::cout << "test FAILED: \n\n";
+        std::cout << "test " << red("FAILED") << ": '" << error.message << "'\n\n";
         return 1;
     }
     else if (!expect_pass && !parse_error)
     {
         //error was expected but didn't happen
-        std::cout << "test FAILED: expected parse error\n\n";
+        std::cout << "test " << red("FAILED") << ": expected parse error\n\n";
         return 1;
     }
     else if (!expect_pass && parse_error)
     {
         //error expected and it happened
-        std::cout << "test PASSED, expected parse error. Error is: \n";
+        std::cout << "test " << blue("PASSED") << ", expected parse error. Error is: '" 
+                  << error.message << "'\n";
     }
 
     std::cout << std::endl;
     
     return 0;
+}
+
+std::string red(const std::string& s)
+{
+    return "\033[31m" + s + "\033[0m";
+}
+
+std::string blue(const std::string& s)
+{
+    return "\033[34m" + s + "\033[0m";
 }
 
 std::string read_file(const std::string& filename)

@@ -15,8 +15,14 @@ debug/%.o: %.cc
 release/%.o: %.cc
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-all: debugdir releasedir debug release
+all: checktodos debugdir releasedir debug release
 
+checktodos:
+	if [[ -n `find . -name "*.[hc]*" -print0 | xargs -0 grep -n "TODO"` ]]; then \
+	    echo "Code still contains TODOs."; \
+	    find . -name "*.[hc]*" -print0 | xargs -0 grep -n "TODO"; \
+	    false; \
+	fi
 debugdir:
 	mkdir -p debug
 releasedir:
@@ -32,7 +38,7 @@ release: $(call PathTransform,SOURCES,release)
 	$(STATIC_LIB) $(call PathTransform,SOURCES,release) -o release/libjson.a
 
 
-test: debugdir debug test/tester.o
+test: checktodos debugdir debug test/tester.o
 	$(CXX) $(LINKFLAGS) -Ldebug/ -ljsond test/tester.o -o test/tester
 
 test/tester.o: test/tester.cc

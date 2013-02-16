@@ -9,7 +9,7 @@
 namespace json
 {
 
-enum class e_Token
+enum class e_Token : uint8_t
 {
     LeftBrace = 0,
     RightBrace,
@@ -50,12 +50,14 @@ class Lexer
             TokenValue value;
             TokenError error;
         };
+
+        Token() : type(e_Token::Error), value{ nullptr, nullptr } { }
         
-        Token(e_Token t, const char* s, const char* e) : type(t), value{s, e}
+        Token(e_Token t, const char* s, const char* e) : type(t), value{ s, e }
         {
         }
 
-        Token(const char* s, const char* e) : type(e_Token::Error), error{s, e}
+        Token(const char* s, const char* e) : type(e_Token::Error), error{ s, e }
         {
         }
     };
@@ -65,6 +67,8 @@ class Lexer
     Lexer(const char* start, const char* end);
 
     Token next();
+    Token peek();
+
   private:
     const char* m_pos;
     const char* m_end;
@@ -80,6 +84,7 @@ struct Error
 {
     const char* pos;
     const char* message;
+    Error() : pos(nullptr), message(nullptr) { }
     Error(const char* p, const char* m) : pos(p), message(m) { }
 };
 
@@ -102,11 +107,26 @@ class Parser
     const char* m_end;
     Lexer m_lexer;
 
-    std::deque<Value> m_stack;
+    e_Token m_prev;
+    
+    enum class e_Context
+    {
+        None,
+        Object,
+        Array
+    };
+
+    e_Context m_context;
+
+    typedef std::pair<Value, e_Context> stack_val;
+    std::deque<stack_val> m_stack;
 
     unsigned int top_type() const;
     void push(const Lexer::Token& token);
     void pop(const Lexer::Token& token);
+    void pop_until_object(const Lexer::Token& token);
+    void pop_until_array(const Lexer::Token& token);
+    void continue_peek(const Lexer::Token& token);
     void error(const Lexer::Token& token);
 
     long long parse_integer(const Lexer::Token& token);

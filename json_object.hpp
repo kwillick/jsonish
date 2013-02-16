@@ -24,8 +24,8 @@ class Object
     Object();
     ~Object();
 
-    template <typename InputIter>
-    void move_assign(InputIter start, InputIter end);
+    template <typename InputIter, typename GetFunc>
+    void move_assign(InputIter start, InputIter end, GetFunc f);
 
     Value& operator[](const char* str);
     const Value& operator[](const char* str) const;
@@ -43,29 +43,22 @@ class Object
     std::size_t size() const     { return m_pairs.size(); }
 
   private:
-    std::vector<Member> m_pairs; //should I be using a std::map<String, Value> ?
+    std::vector<Member> m_pairs;
 };
 
-template <typename InputIter>
-void Object::move_assign(InputIter start, InputIter end)
+template <typename InputIter, typename GetFunc>
+void Object::move_assign(InputIter start, InputIter end, GetFunc f)
 {
-    //iterator expecst (value, key)
-
-    static_assert(std::is_same<typename std::iterator_traits<InputIter>::value_type, Value>::value,
-                  "Iterator must have a value_type of json::Value");
-
-    typedef std::move_iterator<InputIter> move_iterator;
-    
+    //iterator expects (value, key)
     m_pairs.clear();
     
     m_pairs.reserve(std::distance(start, end));
     for (; start != end; ++start)
     {
-        move_iterator first(start++);
-        move_iterator second(start);
+        Value first{ std::forward<Value>(f(*start++)) };
+        Value second{ std::forward<Value>(f(*start)) };
 
-        Value s(*second);
-        m_pairs.emplace_back(s.take<e_JsonType::String>(), std::forward<Value>(*first));
+        m_pairs.emplace_back(second.get<e_JsonType::String>(), first);
     }
 
     std::sort(m_pairs.begin(),

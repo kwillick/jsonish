@@ -102,9 +102,9 @@ Value::~Value()
 {
     switch (m_type)
     {
-    case e_JsonType::Object: m_object->~Object();       break;
-    case e_JsonType::Array:  m_array->~Array();         break;
-    default:                                            break;
+    case e_JsonType::Object: delete m_object;       break;
+    case e_JsonType::Array:  delete m_array;        break;
+    default:                                        break;
     }
 }
 

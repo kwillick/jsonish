@@ -71,9 +71,6 @@ class Value
     const typename impl::result_type<J>::type&
     get(const typename impl::result_type<J>::type* = nullptr) const;
 
-    template <e_JsonType J>
-    typename impl::result_type<J>::type&& take(typename impl::result_type<J>::type* = nullptr);
-
   private:
     e_JsonType m_type;
     union
@@ -100,17 +97,6 @@ class Value
     GET_IMPL(double,    m_floating_point)
 
 #undef GET_IMPL
-
-#define TAKE_IMPL(t, n) \
-    inline t&& take_impl(t*) { m_type = e_JsonType::Null; return std::move(n); }
-
-    TAKE_IMPL(Object,    *m_object)
-    TAKE_IMPL(Array,     *m_array)
-    TAKE_IMPL(String,    m_string);
-    TAKE_IMPL(long long, m_integer)
-    TAKE_IMPL(double,    m_floating_point)
-
-#undef TAKE_IMPL
 };
 
 
@@ -137,13 +123,6 @@ template <e_JsonType J>
 const typename impl::result_type<J>::type& 
 Value::get(const typename impl::result_type<J>::type* p) const
 { return get_impl(p); }
-
-
-template <e_JsonType J>
-typename impl::result_type<J>::type&& Value::take(typename impl::result_type<J>::type* p)
-{
-    return std::forward<typename impl::result_type<J>::type>(take_impl(p));
-}
 
 } //json
 
