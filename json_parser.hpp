@@ -107,7 +107,16 @@ class Parser
     const char* m_end;
     Lexer m_lexer;
 
-    e_Token m_prev;
+    enum class e_Expect : uint8_t
+    {
+        Value = 0,
+        ValueOrClose,
+        CommaOrClose,
+        StringOrClose,
+        String,
+        Colon
+    };
+    e_Expect m_expect;
     
     enum class e_Context
     {
@@ -115,18 +124,18 @@ class Parser
         Object,
         Array
     };
-
     e_Context m_context;
 
     typedef std::pair<Value, e_Context> stack_val;
     std::deque<stack_val> m_stack;
 
     unsigned int top_type() const;
+    void check_expect(const Lexer::Token& token) const;
     void push(const Lexer::Token& token);
     void pop(const Lexer::Token& token);
     void pop_until_object(const Lexer::Token& token);
     void pop_until_array(const Lexer::Token& token);
-    void continue_peek(const Lexer::Token& token);
+    void comma_colon(const Lexer::Token& token);
     void error(const Lexer::Token& token);
 
     long long parse_integer(const Lexer::Token& token);

@@ -211,7 +211,7 @@ Parser::Parser(const char* start, const char* end)
     : m_start(start),
       m_end(end),
       m_lexer(start, end),
-      m_prev(e_Token::EndOfInput),
+      m_expect(e_Expect::Value),
       m_context(e_Context::None)
 {
 }
@@ -223,7 +223,10 @@ enum class e_ParseError : uint8_t
     UnclosedArray,
     TopLevelNotObjectOrArray,
     ExpectedString,
+    ExpectedStringOrCloseObject,
     ExpectedColon,
+    ExpectedCommaOrCloseObject,
+    ExpectedCommaOrCloseArray,
     ExpectedValue,
     ExpectedEndOfInput,
     IntegerOverflow,
@@ -239,7 +242,10 @@ static const char* s_parse_errors[enum_value(e_ParseError::Count)] =
     "Unclosed Array",
     "Top level must be an Object or an Array",
     "Expected string",
+    "Expected string or '}'",
     "Expected ':'",
+    "Expected ',' or '}'",
+    "Expected ',' or ']'",
     "Expected object, array, string, number, true, false, or null",
     "Expected end of input",
     "Integer overflow",
@@ -520,22 +526,22 @@ Value Parser::parse(std::function<void(const Error&)> error_fun)
             throw Error(peek.value.start, 
                         s_parse_errors[enum_value(e_ParseError::TopLevelNotObjectOrArray)]);
         }
+
+        m_expect = e_Expect::Value;
         
         while (true)
         {
             auto token = m_lexer.next();
             const auto& action = s_state_table[static_cast<unsigned int>(token.type)][top_type()];
-
+            
             switch (action)
             {
             case e_Action::Push:     push(token);          break;
             case e_Action::Pop:      pop(token);           break;
-            case e_Action::Continue: continue_peek(token); break;
+            case e_Action::Continue: comma_colon(token);   break;
             case e_Action::Error:    error(token);         break;
             case e_Action::Done:     return done(token);
             }
-
-            m_prev = token.type;
         }
     }
     catch (const Error& err)
@@ -555,52 +561,118 @@ unsigned int Parser::top_type() const
     return static_cast<unsigned int>(top.first.type()) + 1;
 }
 
+static inline bool _token_is_value(const Lexer::Token& token)
+{
+    return (token.type == e_Token::LeftBrace   ||
+            token.type == e_Token::LeftBracket ||
+            token.type == e_Token::String      ||
+            token.type == e_Token::Integer     ||
+            token.type == e_Token::Float       ||
+            token.type == e_Token::True        ||
+            token.type == e_Token::False       ||
+            token.type == e_Token::Null);
+}
+
+void Parser::check_expect(const Lexer::Token& token) const
+{
+    switch (m_expect)
+    {
+    case e_Expect::Value:
+        if (!_token_is_value(token))
+            throw Error(token.value.start, s_parse_errors[enum_value(e_ParseError::ExpectedValue)]);
+        break;
+    case e_Expect::ValueOrClose:
+        if (!_token_is_value(token) && 
+            token.type != e_Token::RightBrace &&
+            token.type != e_Token::RightBracket)
+        {
+            throw Error(token.value.start, s_parse_errors[enum_value(e_ParseError::ExpectedValue)]);
+        }
+        break;
+    case e_Expect::CommaOrClose:
+        if (token.type != e_Token::Comma &&
+            token.type != e_Token::RightBrace &&
+            token.type != e_Token::RightBracket)
+        {
+            const char* emsg_ptr = nullptr;
+            if (m_context == e_Context::Object)
+                emsg_ptr = s_parse_errors[enum_value(e_ParseError::ExpectedCommaOrCloseObject)];
+            else if (m_context == e_Context::Array)
+                emsg_ptr = s_parse_errors[enum_value(e_ParseError::ExpectedCommaOrCloseArray)];
+            throw Error(token.value.start, emsg_ptr);
+        }
+        break;
+    case e_Expect::StringOrClose:
+        if (token.type != e_Token::String &&
+            token.type != e_Token::RightBrace &&
+            token.type != e_Token::RightBracket)
+        {
+            throw Error(token.value.start,
+                        s_parse_errors[enum_value(e_ParseError::ExpectedStringOrCloseObject)]);
+        }
+        break;
+    case e_Expect::String:
+        if (token.type != e_Token::String)
+        {
+            throw Error(token.value.start,
+                        s_parse_errors[enum_value(e_ParseError::ExpectedString)]);
+        }
+        break;
+    case e_Expect::Colon:
+        if (token.type != e_Token::Colon)
+            throw Error(token.value.start, s_parse_errors[enum_value(e_ParseError::ExpectedColon)]);
+        break;
+    }
+}
+
 void Parser::push(const Lexer::Token& token)
 {
-    if (m_prev == e_Token::LeftBrace && token.type != e_Token::String)
-        throw Error(token.value.start, s_parse_errors[enum_value(e_ParseError::ExpectedString)]);
-
-    if (m_prev == e_Token::Comma && m_context == e_Context::Object && token.type != e_Token::String)
-        throw Error(token.value.start, s_parse_errors[enum_value(e_ParseError::ExpectedString)]);
+    check_expect(token);
 
     switch (token.type)
     {
     case e_Token::LeftBrace:
         m_stack.emplace_front(Object(), m_context);
         m_context = e_Context::Object;
+        m_expect = e_Expect::StringOrClose;
         break;
     case e_Token::LeftBracket:
         m_stack.emplace_front(Array(), m_context);
         m_context = e_Context::Array;
+        m_expect = e_Expect::ValueOrClose;
         break;
     case e_Token::String:
-        if (m_context == e_Context::Object && 
-            (m_prev == e_Token::LeftBrace || m_prev == e_Token::Comma))
+        if (m_context == e_Context::Object)
         {
-            auto peek = m_lexer.peek();
-            if (peek.type != e_Token::Colon)
-            {
-                throw Error(peek.value.start, 
-                            s_parse_errors[enum_value(e_ParseError::ExpectedColon)]);
-            }
+            if (m_expect == e_Expect::Value)
+                m_expect = e_Expect::CommaOrClose;
+            else if (m_expect == e_Expect::String || m_expect == e_Expect::StringOrClose)
+                m_expect = e_Expect::Colon;
         }
+        else if (m_context == e_Context::Array)
+            m_expect = e_Expect::CommaOrClose;
 
         m_stack.emplace_front(String(token.value.start, token.value.end), m_context);
         break;
     case e_Token::Integer:
         m_stack.emplace_front(parse_integer(token), m_context);
+        m_expect = e_Expect::CommaOrClose;
         break;
     case e_Token::Float:
         m_stack.emplace_front(parse_float(token), m_context);
+        m_expect = e_Expect::CommaOrClose;
         break;
     case e_Token::True:
         m_stack.emplace_front(Value(true), m_context);
+        m_expect = e_Expect::CommaOrClose;
         break;
     case e_Token::False:
         m_stack.emplace_front(Value(false), m_context);
+        m_expect = e_Expect::CommaOrClose;
         break;
     case e_Token::Null:
         m_stack.emplace_front(Value(), m_context);
+        m_expect = e_Expect::CommaOrClose;
         break;
     default:
         throw Error(token.value.start, nullptr);
@@ -609,6 +681,8 @@ void Parser::push(const Lexer::Token& token)
 
 void Parser::pop(const Lexer::Token& token)
 {
+    check_expect(token);
+
     if (token.type == e_Token::RightBracket)
         pop_until_array(token);
     else if (token.type == e_Token::RightBrace)
@@ -692,27 +766,14 @@ void Parser::pop_until_array(const Lexer::Token& token)
     m_context = it->second;
 }
 
-void Parser::continue_peek(const Lexer::Token& token)
+void Parser::comma_colon(const Lexer::Token& token)
 {
-    auto peek = m_lexer.peek();
-    switch (peek.type)
-    {
-    case e_Token::LeftBrace:
-    case e_Token::LeftBracket:
-    case e_Token::String:
-    case e_Token::Integer:
-    case e_Token::Float:
-    case e_Token::True:
-    case e_Token::False:
-    case e_Token::Null:
-        return;
+    check_expect(token);
 
-    case e_Token::Error:
-        throw Error(peek.error.pos, peek.error.message);
-
-    default:
-        throw Error(peek.value.start, s_parse_errors[enum_value(e_ParseError::ExpectedValue)]);
-    }
+    if (m_context == e_Context::Object && token.type == e_Token::Comma)
+        m_expect = e_Expect::String;
+    else
+        m_expect = e_Expect::Value;
 }
 
 void Parser::error(const Lexer::Token& token)
