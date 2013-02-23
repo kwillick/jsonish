@@ -134,7 +134,8 @@ class Parser
         e_Context context;
         unsigned int length;
 
-        stack_state(Value&& v, e_Context c, unsigned int l) : value(v), context(c), length(l) { }
+        stack_state(Value&& v, e_Context c, unsigned int l) 
+            : value(std::forward<Value>(v)), context(c), length(l) { }
     };
 
     std::deque<stack_state> m_stack;
