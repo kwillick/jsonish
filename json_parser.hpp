@@ -118,7 +118,7 @@ class Parser
     };
     e_Expect m_expect;
     
-    enum class e_Context
+    enum class e_Context : uint8_t
     {
         None,
         Object,
@@ -126,8 +126,18 @@ class Parser
     };
     e_Context m_context;
 
-    typedef std::pair<Value, e_Context> stack_val;
-    std::deque<stack_val> m_stack;
+    unsigned int m_length;
+
+    struct stack_state
+    {
+        Value value;
+        e_Context context;
+        unsigned int length;
+
+        stack_state(Value&& v, e_Context c, unsigned int l) : value(v), context(c), length(l) { }
+    };
+
+    std::deque<stack_state> m_stack;
 
     unsigned int top_type() const;
     void check_expect(const Lexer::Token& token) const;

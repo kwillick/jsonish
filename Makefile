@@ -1,4 +1,5 @@
 CXX = clang++
+CC = clang
 CXXFLAGS = -c -std=c++11 -stdlib=libc++ -Wall
 LINKFLAGS = -stdlib=libc++
 
@@ -15,14 +16,8 @@ debug/%.o: %.cc
 release/%.o: %.cc
 	$(CXX) $(CXXFLAGS) $< -o $@
 
-all: checktodos debugdir releasedir debug release
+all: debugdir releasedir debug release
 
-checktodos:
-	if [[ -n `find . -name "*.[hc]*" -print0 | xargs -0 grep -n "TODO"` ]]; then \
-	    echo "Code still contains TODOs."; \
-	    find . -name "*.[hc]*" -print0 | xargs -0 grep -n "TODO"; \
-	    false; \
-	fi
 debugdir:
 	mkdir -p debug
 releasedir:
@@ -38,15 +33,22 @@ release: $(call PathTransform,SOURCES,release)
 	$(STATIC_LIB) $(call PathTransform,SOURCES,release) -o release/libjson.a
 
 
-test: checktodos debugdir debug test/tester.o
+test: debugdir debug test/tester.o
 	$(CXX) $(LINKFLAGS) -Ldebug/ -ljsond test/tester.o -o test/tester
 
 test/tester.o: test/tester.cc
 	$(CXX) $(CXXFLAGS) -g test/tester.cc -o test/tester.o
 
+
+bench: releasedir release
+	mkdir -p bench/build
+	$(CC) -c -O4 -flto bench/parse_bench_JSONKit.m -o bench/build/parse_bench_JSONKit.o
+	$(CC) -c -O4 -flto bench/JSONKit/JSONKit.m -o bench/build/JSONKit.o
+	$(CC) -flto -framework Foundation bench/build/*.o -o bench/parse_bench_JSONKit
+
 .PHONY: clean
 clean:
-	rm -rf debug release test/tester.o test/tester
+	rm -rf debug release test/tester.o test/tester bench/build
 
 
 json_value.o: json_value.cc json_value.hpp json_string.hpp json_object.hpp
