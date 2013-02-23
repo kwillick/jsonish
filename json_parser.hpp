@@ -114,7 +114,8 @@ class Parser
         CommaOrClose,
         StringOrClose,
         String,
-        Colon
+        Colon,
+        EndOfInput
     };
     e_Expect m_expect;
     

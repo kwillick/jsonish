@@ -591,16 +591,27 @@ void Parser::check_expect(const Lexer::Token& token) const
         }
         break;
     case e_Expect::CommaOrClose:
-        if (token.type != e_Token::Comma &&
-            token.type != e_Token::RightBrace &&
-            token.type != e_Token::RightBracket)
         {
             const char* emsg_ptr = nullptr;
-            if (m_context == e_Context::Object)
-                emsg_ptr = s_parse_errors[enum_value(e_ParseError::ExpectedCommaOrCloseObject)];
-            else if (m_context == e_Context::Array)
+        
+            if (token.type != e_Token::Comma &&
+                token.type != e_Token::RightBrace &&
+                token.type != e_Token::RightBracket)
+            {
+                if (m_context == e_Context::Object)
+                    emsg_ptr = s_parse_errors[enum_value(e_ParseError::ExpectedCommaOrCloseObject)];
+                else if (m_context == e_Context::Array)
+                    emsg_ptr = s_parse_errors[enum_value(e_ParseError::ExpectedCommaOrCloseArray)];
+                throw Error(token.value.start, emsg_ptr);
+            }
+
+            if (token.type == e_Token::RightBrace && m_context == e_Context::Array)
                 emsg_ptr = s_parse_errors[enum_value(e_ParseError::ExpectedCommaOrCloseArray)];
-            throw Error(token.value.start, emsg_ptr);
+            else if (token.type == e_Token::RightBracket && m_context == e_Context::Object)
+                emsg_ptr = s_parse_errors[enum_value(e_ParseError::ExpectedCommaOrCloseObject)];
+
+            if (emsg_ptr)
+                throw Error(token.value.start, emsg_ptr);
         }
         break;
     case e_Expect::StringOrClose:
@@ -622,6 +633,13 @@ void Parser::check_expect(const Lexer::Token& token) const
     case e_Expect::Colon:
         if (token.type != e_Token::Colon)
             throw Error(token.value.start, s_parse_errors[enum_value(e_ParseError::ExpectedColon)]);
+        break;
+    case e_Expect::EndOfInput:
+        if (token.type != e_Token::EndOfInput)
+        {
+            throw Error(token.value.start,
+                        s_parse_errors[enum_value(e_ParseError::ExpectedEndOfInput)]);
+        }
         break;
     }
 }
@@ -699,37 +717,9 @@ void Parser::pop(const Lexer::Token& token)
 
     if (m_context != e_Context::None)
         m_expect = e_Expect::CommaOrClose;
+    else
+        m_expect = e_Expect::EndOfInput;
 }
-
-// void Parser::pop_until_object(const Lexer::Token& token)
-// {
-//     auto it = m_stack.begin();
-//     for (; it != m_stack.end(); ++it)
-//     {
-//         if (it->first.type() == e_JsonType::Object)
-//         {
-//             const Object& obj = it->first.get<e_JsonType::Object>();
-//             if (obj.empty())
-//                 break;
-//         }
-//     }
-
-//     if (it == m_stack.end())
-//         throw Error(token.value.start, s_parse_errors[enum_value(e_ParseError::UnclosedObject)]);
-
-//     auto start = m_stack.begin();
-//     if (start != it)
-//     {
-//         auto& object = it->first.get<e_JsonType::Object>();
-//         object.move_assign(start, it, 
-//                            [](stack_val& v) -> Value&& {
-//                                return std::move(v.first);
-//                            });
-//         m_stack.erase(start, it);
-//     }
-
-//     m_context = it->second;
-// }
 
 void Parser::pop_until_object(const Lexer::Token& token)
 {
@@ -758,44 +748,6 @@ static inline OutputIter move_transform(InputIter start, InputIter end, OutputIt
         *out++ = std::forward<value_type>(op(*start++));
     return out;
 }
-
-// void Parser::pop_until_array(const Lexer::Token& token)
-// {
-//     auto it = m_stack.begin();
-//     for (; it != m_stack.end(); ++it)
-//     {
-//         if (it->first.type() == e_JsonType::Array)
-//         {
-//             const Array& arr = it->first.get<e_JsonType::Array>();
-//             if (arr.empty())
-//                 break;
-//         }
-//     }
-
-//     if (it == m_stack.end())
-//         throw Error(token.value.start, s_parse_errors[enum_value(e_ParseError::UnclosedArray)]);
-
-//     using reverse_iter_type = std::reverse_iterator<decltype(it)>;
-
-//     auto start = m_stack.begin();
-//     if (start != it)
-//     {
-//         auto& array = it->first.get<e_JsonType::Array>();
-//         array.resize(std::distance(start, it));
-
-//         reverse_iter_type rstart{ start };
-//         reverse_iter_type rit{ it };
-
-//         move_transform(rit, rstart, array.begin(),
-//                        [](stack_val& v) -> Value&& {
-//                            return std::move(v.first);
-//                        });
-
-//         m_stack.erase(start, it);
-//     }
-
-//     m_context = it->second;
-// }
 
 void Parser::pop_until_array(const Lexer::Token& token)
 {
