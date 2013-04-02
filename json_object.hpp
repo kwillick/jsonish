@@ -16,8 +16,8 @@ namespace json
 
 class Object
 {
-    typedef std::pair<String, Value>            Member;
   public:
+    typedef std::pair<String, Value>            Member;
     typedef std::vector<Member>::iterator       iterator;
     typedef std::vector<Member>::const_iterator const_iterator;
     
