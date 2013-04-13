@@ -1,12 +1,13 @@
 #ifndef JSON_OBJECT_H
 #define JSON_OBJECT_H
 
-#include <vector>
+#include <map>
 #include <iterator>
 #include <type_traits>
 #include <algorithm>
 #include <utility>
 #include <string>
+#include <cstring>
 
 #include "json_string.hpp"
 #include "json_value.hpp"
@@ -17,9 +18,8 @@ namespace json
 class Object
 {
   public:
-    typedef std::pair<String, Value>            Member;
-    typedef std::vector<Member>::iterator       iterator;
-    typedef std::vector<Member>::const_iterator const_iterator;
+    typedef std::map<String, Value>::iterator       iterator;
+    typedef std::map<String, Value>::const_iterator const_iterator;
     
     Object();
     ~Object();
@@ -27,11 +27,31 @@ class Object
     template <typename InputIter, typename GetFunc>
     void move_assign(InputIter start, InputIter end, GetFunc f);
 
-    Value& operator[](const char* str);
-    const Value& operator[](const char* str) const;
+    Value& operator[](const char* str)
+    {
+        return m_pairs[String(str, str + std::strlen(str) + 1)];
+    }
 
-    Value& operator[](const std::string& str);
-    const Value& operator[](const std::string& str) const;
+    const Value& operator[](const char* str) const
+    {
+        String key{str, str + std::strlen(str) + 1};
+        auto pos = m_pairs.find(key);
+        return pos->second;
+    }
+
+    Value& operator[](const std::string& str)
+    {
+        auto start = &str[0];
+        return m_pairs[String(start, start + str.length())];
+    }
+
+    const Value& operator[](const std::string& str) const
+    {
+        auto start = &str[0];
+        String key{start, start + str.length()};
+        auto pos = m_pairs.find(key);
+        return pos->second;
+    }
 
     iterator begin()             { return m_pairs.begin(); }
     const_iterator begin() const { return m_pairs.cbegin(); }
@@ -43,7 +63,7 @@ class Object
     std::size_t size() const     { return m_pairs.size(); }
 
   private:
-    std::vector<Member> m_pairs;
+    std::map<String, Value> m_pairs;
 };
 
 template <typename InputIter, typename GetFunc>
@@ -52,20 +72,13 @@ void Object::move_assign(InputIter start, InputIter end, GetFunc f)
     //iterator expects (value, key)
     m_pairs.clear();
     
-    m_pairs.reserve(std::distance(start, end));
     for (; start != end; ++start)
     {
         Value first{ std::forward<Value>(f(*start++)) };
         Value second{ std::forward<Value>(f(*start)) };
 
-        m_pairs.emplace_back(second.get<e_JsonType::String>(), first);
+        m_pairs.emplace(second.get<e_JsonType::String>(), first);
     }
-
-    std::sort(m_pairs.begin(),
-              m_pairs.end(),
-              [](const Member& a, const Member& b) -> bool {
-                  return a.first < b.first;
-              });
 }
 
 } //json

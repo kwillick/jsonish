@@ -45,7 +45,11 @@ static inline void _print_indent(int n)
 void print_object(const json::Object& object, int indent)
 {
     std::cout << "{\n";
-    auto last = object.end() - 1;
+    auto last = object.end();
+
+    if (object.size() != 0)
+        --last;
+
     for (auto it = object.begin(); it != object.end(); ++it)
     {
         _print_indent(indent);
