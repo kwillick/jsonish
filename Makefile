@@ -24,12 +24,12 @@ releasedir:
 	mkdir -p release
 
 debug: CXXFLAGS += -g
-debug: $(call PathTransform,SOURCES,debug)
+debug: $(call PathTransform,SOURCES,debug) debug/json_debug.o
 	$(STATIC_LIB) $(call PathTransform,SOURCES,debug) -o debug/libjsond.a
 
 release: CXXFLAGS += -O4 -flto
 release: $(call PathTransform,SOURCES,release)
-	$(SHARED_LIB) $(call PathTransform,SOURCES,release) -o release/libjson.dylib
+#$(SHARED_LIB) $(call PathTransform,SOURCES,release) -o release/libjson.dylib
 	$(STATIC_LIB) $(call PathTransform,SOURCES,release) -o release/libjson.a
 
 
