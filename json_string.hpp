@@ -16,22 +16,17 @@ class String
 
     bool operator<(const String& rhs) const
     {
-        auto len = std::min(std::distance(m_start, m_end), std::distance(rhs.m_start, rhs.m_end));
-        return strncmp(m_start, rhs.m_start, len) < 0;
+        return std::lexicographical_compare(m_start, m_end, rhs.m_start, rhs.m_end);
     }
 
     bool operator<(const char* rhs) const
     {
-        auto dist = std::distance(m_start, m_end);
-        auto len = std::min(dist, static_cast<decltype(dist)>(strlen(rhs)));
-        return strncmp(m_start, rhs, len) < 0;
+        return std::lexicographical_compare(m_start, m_end, rhs, rhs + std::strlen(rhs) + 1);
     }
 
     bool operator<(const std::string& rhs) const
     {
-        auto dist = std::distance(m_start, m_end);
-        auto len = std::min(dist, static_cast<decltype(dist)>(rhs.length()));
-        return strncmp(m_start, rhs.data(), len) < 0;
+        return std::lexicographical_compare(m_start, m_end, rhs.cbegin(), rhs.cend());
     }
 
     std::string to_string() const { return std::string(m_start, m_end); }

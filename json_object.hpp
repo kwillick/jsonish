@@ -1,13 +1,14 @@
 #ifndef JSON_OBJECT_H
 #define JSON_OBJECT_H
 
+#include <utility>
 #include <map>
 #include <iterator>
 #include <type_traits>
 #include <algorithm>
-#include <utility>
 #include <string>
 #include <cstring>
+#include <iostream>
 
 #include "json_string.hpp"
 #include "json_value.hpp"
@@ -29,12 +30,12 @@ class Object
 
     Value& operator[](const char* str)
     {
-        return m_pairs[String(str, str + std::strlen(str) + 1)];
+        return m_pairs[String(str, str + std::strlen(str))];
     }
 
     const Value& operator[](const char* str) const
     {
-        String key{str, str + std::strlen(str) + 1};
+        String key{str, str + std::strlen(str)};
         auto pos = m_pairs.find(key);
         return pos->second;
     }
