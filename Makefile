@@ -3,7 +3,7 @@ CC = clang
 CXXFLAGS = -c -std=c++11 -stdlib=libc++ -Wall
 LINKFLAGS = -stdlib=libc++
 
-SOURCES = json_value.cc json_object.cc json_parser.cc
+SOURCES = json_value.cc json_object.cc json_parser.cc json_writer.cc
 
 SHARED_LIB = $(CXX) -shared -dynamiclib $(LINKFLAGS)
 STATIC_LIB = libtool -static
@@ -40,12 +40,6 @@ test/tester.o: test/tester.cc
 	$(CXX) $(CXXFLAGS) -g test/tester.cc -o test/tester.o
 
 
-bench: releasedir release
-	mkdir -p bench/build
-	$(CC) -c -O4 -flto bench/parse_bench_JSONKit.m -o bench/build/parse_bench_JSONKit.o
-	$(CC) -c -O4 -flto bench/JSONKit/JSONKit.m -o bench/build/JSONKit.o
-	$(CC) -flto -framework Foundation bench/build/*.o -o bench/parse_bench_JSONKit
-
 .PHONY: clean
 clean:
 	rm -rf debug release test/tester.o test/tester bench/build
@@ -54,3 +48,4 @@ clean:
 json_value.o: json_value.cc json_value.hpp json_string.hpp json_object.hpp
 json_parser.o: json_parser.cc json_parser.hpp json_value.hpp json_string.hpp json_object.hpp
 json_object.o: json_object.cc json_value.hpp json_string.hpp
+json_writer.o: json_writer.cc json_writer.hpp

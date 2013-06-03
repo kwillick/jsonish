@@ -22,8 +22,8 @@ class Object
     typedef std::map<String, Value>::iterator       iterator;
     typedef std::map<String, Value>::const_iterator const_iterator;
     
-    Object();
-    ~Object();
+    Object() { }
+    ~Object() { }
 
     template <typename InputIter, typename GetFunc>
     void move_assign(InputIter start, InputIter end, GetFunc f);
