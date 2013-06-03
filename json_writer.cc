@@ -9,9 +9,21 @@ namespace json
 namespace writer
 {
 
+Object::Object() { }
+
+Object::Object(std::initializer_list<std::pair<const std::string, Value>> ilist)
+    : m_pairs(ilist) { }
+
+
+Object::const_iterator Object::cbegin() const { return m_pairs.cbegin(); }
+Object::const_iterator Object::cend() const { return m_pairs.cend(); }
+
+Object::~Object() { }
+
+
 Value::Value() : m_type{e_JsonType::Null} { }
 
-Value::Value(const Object& obj) : m_type{e_JsonType::Object}, m_object{new Object{obj}} { }
+Value::Value(const Object& obj) : m_type{e_JsonType::Object}, m_object{new Object(obj)} { }
 
 Value::Value(Object&& obj) 
     : m_type{e_JsonType::Object}, 
@@ -19,7 +31,7 @@ Value::Value(Object&& obj)
 {
 }
 
-Value::Value(const Array& arr) : m_type{e_JsonType::Array}, m_array{new Array{arr}} { }
+Value::Value(const Array& arr) : m_type{e_JsonType::Array}, m_array{new Array(arr)} { }
 
 Value::Value(Array&& arr) : 
     m_type{e_JsonType::Array},
@@ -27,7 +39,9 @@ Value::Value(Array&& arr) :
 {
 }
 
-Value::Value(const String& str) : m_type{e_JsonType::String}, m_string{str} { }
+Value::Value(const std::string& str) : m_type{e_JsonType::String}, m_string{str} { }
+
+Value::Value(int i) : m_type{e_JsonType::Integer}, m_integer{i} { }
 
 Value::Value(long long i) : m_type{e_JsonType::Integer}, m_integer{i} { }
 
@@ -40,13 +54,13 @@ void Value::copy_guts(const Value& o)
     switch (m_type)
     {
     case e_JsonType::Object:
-        m_object = new Object{*o.m_object};
+        m_object = new Object(*o.m_object);
         break;
     case e_JsonType::Array:
-        m_array = new Array{*o.m_array};
+        m_array = new Array(*o.m_array);
         break;
     case e_JsonType::String:
-        new (&m_string) std::string{o.m_string};
+        new (&m_string) std::string(o.m_string);
         break;
     case e_JsonType::Integer:
         m_integer = o.m_integer;
@@ -142,7 +156,7 @@ struct stack_value
 
     stack_value(object_iterator s, object_iterator e, object_iterator p)
         : type{e_StackElementType::Object},
-        object_pos{s, e, p} 
+          object_pos{s, e, p} 
     { }
 
     stack_value(array_iterator s, array_iterator e, array_iterator p)
@@ -214,16 +228,48 @@ static inline void simple_value_write(std::ostream& o, const Value& v)
     }
 }
 
-static inline std::ostream& write_impl(std::ostream& o, std::stack<stack_value>& stack)
+static inline void write_comma_on_close(std::ostream& o, const std::stack<stack_value>& stack)
+{
+    if (!stack.empty())
+    {
+        const auto& top = stack.top();
+        if (top.type == e_StackElementType::Object)
+        {
+            if (top.object_pos.start != top.object_pos.end &&
+                top.object_pos.pos != top.object_pos.end)
+            {
+                o << ',';
+            }
+        }
+        else
+        {
+            if (top.array_pos.start != top.array_pos.end &&
+                top.array_pos.pos != top.array_pos.end)
+            {
+                o << ',';
+            }
+        }
+    }
+}
+
+static void write_impl(std::ostream& o, std::stack<stack_value>& stack)
 {
     while (!stack.empty())
     {
     loop_begin:
-        stack_value& top = stack.top();
+        stack_value top{stack.top()};
+        stack.pop();
         if (top.type == e_StackElementType::Object)
         {
+            if (top.object_pos.start == top.object_pos.end)
+            {
+                o << "{}";
+                write_comma_on_close(o, stack);
+                continue;
+            }
+            
             if (top.object_pos.pos == top.object_pos.start)
-                o << "{";
+                o << '{';
 
             auto end = top.object_pos.end;
             auto last_comma = end;
@@ -231,11 +277,15 @@ static inline std::ostream& write_impl(std::ostream& o, std::stack<stack_value>&
 
             for (auto& pos = top.object_pos.pos; pos != end; ++pos)
             {
-                o << '"' << pos->first.get<e_JsonType::String>() << '"';
+                o << '"' << pos->first << "\":";
                 switch (pos->second.type())
                 {
                 case e_JsonType::Object: 
                     {
+                        auto next = pos;
+                        ++next;
+                        stack.emplace(top.object_pos.start, end, next);
+
                         const auto& obj = pos->second.get<e_JsonType::Object>();
                         stack.emplace(obj.cbegin(), obj.cend(), obj.cbegin());
                         goto loop_begin;
@@ -244,6 +294,10 @@ static inline std::ostream& write_impl(std::ostream& o, std::stack<stack_value>&
 
                 case e_JsonType::Array:
                     {
+                        auto next = pos;
+                        ++next;
+                        stack.emplace(top.object_pos.start, end, next);
+
                         const auto& arr = pos->second.get<e_JsonType::Array>();
                         stack.emplace(arr.cbegin(), arr.cend(), arr.cbegin());
                         goto loop_begin;
@@ -259,10 +313,18 @@ static inline std::ostream& write_impl(std::ostream& o, std::stack<stack_value>&
                     o << ',';
             }
             
-            o << "}";
+            o << '}';
+            write_comma_on_close(o, stack);
         }
         else
         {
+            if (top.array_pos.start == top.array_pos.end)
+            {
+                o << "[]";
+                write_comma_on_close(o, stack);
+                continue;
+            }
+
             if (top.array_pos.pos == top.array_pos.start)
                 o << '[';
             
@@ -276,6 +338,10 @@ static inline std::ostream& write_impl(std::ostream& o, std::stack<stack_value>&
                 {
                 case e_JsonType::Object:
                     {
+                        auto next = pos;
+                        ++next;
+                        stack.emplace(top.array_pos.start, end, next);
+                        
                         const auto& obj = pos->get<e_JsonType::Object>();
                         stack.emplace(obj.cbegin(), obj.cend(), obj.cbegin());
                         goto loop_begin;
@@ -283,6 +349,10 @@ static inline std::ostream& write_impl(std::ostream& o, std::stack<stack_value>&
                     break;
                 case e_JsonType::Array:
                     {
+                        auto next = pos;
+                        ++next;
+                        stack.emplace(top.array_pos.start, end, next);
+                        
                         const auto& arr = pos->get<e_JsonType::Array>();
                         stack.emplace(arr.cbegin(), arr.cend(), arr.cbegin());
                         goto loop_begin;
@@ -299,28 +369,25 @@ static inline std::ostream& write_impl(std::ostream& o, std::stack<stack_value>&
             }
             
             o << ']';
+            write_comma_on_close(o, stack);
         }
-        
-        stack.pop();
     }
-
-    return o;
 }
 
-std::ostream& write(std::ostream& o, const Object& object)
+void write(std::ostream& o, const Object& object)
 {
     std::stack<stack_value> stack;
     stack.emplace(object.cbegin(), object.cend(), object.cbegin());
 
-    return write_impl(o, stack);
+    write_impl(o, stack);
 }
 
-std::ostream& write(std::ostream& o, const Array& array)
+void write(std::ostream& o, const Array& array)
 {
     std::stack<stack_value> stack;
     stack.emplace(array.cbegin(), array.cend(), array.cbegin());
     
-    return write_impl(o, stack);
+    write_impl(o, stack);
 }
 
 } //writer

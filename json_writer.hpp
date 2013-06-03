@@ -16,7 +16,23 @@ namespace writer
 
 class Value;
 
-typedef std::map<std::string, Value> Object;
+class Object
+{
+  public:
+    typedef std::map<std::string, Value> map_type;
+    typedef map_type::const_iterator     const_iterator;
+
+    Object();
+    Object(std::initializer_list<std::pair<const std::string, Value>> ilist);
+    ~Object();
+
+    const_iterator cbegin() const;
+    const_iterator cend() const;
+
+  private:
+    std::map<std::string, Value> m_pairs;
+};
+
 typedef std::vector<Value>           Array;
 
 enum class e_JsonType
@@ -52,6 +68,7 @@ class Value
 
     Value(const std::string& str);
 
+    Value(int i);
     Value(long long i);
     Value(double d);
     Value(bool b);
@@ -103,8 +120,8 @@ class Value
 };
 
 
-std::ostream& write(std::ostream& o, const Object& object);
-std::ostream& write(std::ostream& o, const Array& array);
+void write(std::ostream& o, const Object& object);
+void write(std::ostream& o, const Array& array);
 
 
 namespace impl

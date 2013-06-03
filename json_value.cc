@@ -7,7 +7,7 @@ namespace json
 
 Value::Value() : m_type{e_JsonType::Null} { }
 
-Value::Value(const Object& obj) : m_type{e_JsonType::Object}, m_object{new Object{obj}} { }
+Value::Value(const Object& obj) : m_type{e_JsonType::Object}, m_object{new Object(obj)} { }
 
 Value::Value(Object&& obj) 
     : m_type{e_JsonType::Object}, 
@@ -15,7 +15,7 @@ Value::Value(Object&& obj)
 {
 }
 
-Value::Value(const Array& arr) : m_type{e_JsonType::Array}, m_array{new Array{arr}} { }
+Value::Value(const Array& arr) : m_type{e_JsonType::Array}, m_array{new Array(arr)} { }
 
 Value::Value(Array&& arr) : 
     m_type{e_JsonType::Array},
@@ -36,13 +36,13 @@ void Value::copy_guts(const Value& o)
     switch (m_type)
     {
     case e_JsonType::Object:
-        m_object = new Object{*o.m_object};
+        m_object = new Object(*o.m_object);
         break;
     case e_JsonType::Array:
-        m_array = new Array{*o.m_array};
+        m_array = new Array(*o.m_array);
         break;
     case e_JsonType::String:
-        new (&m_string) String{o.m_string};
+        new (&m_string) String(o.m_string);
         break;
     case e_JsonType::Integer:
         m_integer = o.m_integer;
