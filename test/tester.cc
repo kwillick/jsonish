@@ -29,9 +29,7 @@ int main(int argc, char *argv[])
     
     std::cout << "test: " << filename << " expected " << (expect_pass ? "pass" : "fail") << "\n";
 
-    const char* start = &*text.begin();
-    const char* end = start + text.length();
-    json::Parser parser(start, end);
+    json::Parser parser{text};
     bool parse_error = false;
     json::Error error;
     json::Value result = parser.parse([&parse_error,&error](const json::Error& err)

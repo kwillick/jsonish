@@ -217,6 +217,10 @@ Parser::Parser(const char* start, const char* end)
 {
 }
 
+Parser::Parser(const std::string& input) : Parser(input.data(), input.data() + input.length())
+{
+}
+
 
 enum class e_ParseError : uint8_t
 {
@@ -517,6 +521,13 @@ void Parser::reset(const char* start, const char* end)
     reset();
 }
 
+void Parser::reset(const std::string& input)
+{
+    m_start = input.data();
+    m_end = input.data() + input.length();
+    reset();
+}
+
 Value Parser::parse(std::function<void(const Error&)> error_fun)
 {
     try
@@ -533,7 +544,7 @@ Value Parser::parse(std::function<void(const Error&)> error_fun)
         while (true)
         {
             auto token = m_lexer.next();
-            const auto& action = s_state_table[static_cast<unsigned int>(token.type)][top_type()];
+            const auto& action = s_state_table[enum_value(token.type)][top_type()];
             
             switch (action)
             {

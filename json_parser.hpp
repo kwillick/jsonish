@@ -4,6 +4,7 @@
 #include <deque>
 #include <utility>
 #include <functional>
+#include <string>
 #include "json_value.hpp"
 
 namespace json
@@ -95,10 +96,12 @@ class Parser
 
     Parser(const char* input);
     Parser(const char* start, const char* end);
+    Parser(const std::string& input);
 
     void reset();
     void reset(const char* input);
     void reset(const char* start, const char* end);
+    void reset(const std::string& input);
 
     Value parse(std::function<void(const Error&)> error_fun);
 
