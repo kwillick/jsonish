@@ -5,20 +5,18 @@
 #include <stack>
 #include <algorithm>
 #include <iterator>
+#include <limits>
+#include <cstdio>
 #include "json_object.hpp"
 #include "json_value.hpp"
 
 namespace json
 {
 
-void write(std::ostream& o, const Object& object);
-void write(std::ostream& o, const Array& array);
+void write(std::ostream& o, const Value& val);
 
 template <unsigned int IndentWidth = 4>
-void write_pretty(std::ostream& o, const Object& object);
-
-template <unsigned int IndentWidth = 4>
-void write_pretty(std::ostream& o, const Array& object);
+void write_pretty(std::ostream& o, const Value& val);
 
 
 namespace impl
@@ -117,7 +115,7 @@ struct stack_value
 
 
 template <std::size_t N>
-static inline void ostream_write(std::ostream& o, const char (&str)[N]) { o.write(str, N - 1); }
+inline void ostream_write(std::ostream& o, const char (&str)[N]) { o.write(str, N - 1); }
 
 
 template <unsigned int IndentWidth>
@@ -148,12 +146,11 @@ struct indenter
     {
         if ((top.is_object() && !top.object_empty() && !top.at_object_end()) ||
             (!top.array_empty() && !top.at_array_end()))
-            o.write(",\n", 2);
+            ostream_write(o, ",\n");
     }
 
     static void comma(std::ostream& o)       { ostream_write(o, ",\n"); }
     static void colon(std::ostream& o)       { ostream_write(o, ": "); }
-    static void space(std::ostream& o)       { o.put(' '); }
 };
 
 template <>
@@ -174,10 +171,9 @@ struct indenter<0>
 
     static void comma(std::ostream& o) { o.put(','); }
     static void colon(std::ostream& o) { o.put(':'); }
-    static void space(std::ostream& o) { }
 };
 
-static inline void write_string(std::ostream& o, const String& s)
+inline void write_string(std::ostream& o, const String& s)
 {
     o.put('"');
     auto len = std::distance(s.begin(), s.end());
@@ -185,7 +181,7 @@ static inline void write_string(std::ostream& o, const String& s)
     o.put('"');
 }
 
-static inline void write_simple_value(std::ostream& o, const Value& v)
+inline void write_simple_value(std::ostream& o, const Value& v)
 {
     switch (v.type())
     {
@@ -198,8 +194,13 @@ static inline void write_simple_value(std::ostream& o, const Value& v)
         o << v.get<e_JsonType::Integer>();
         break;
     case e_JsonType::FloatingPoint:
-        o << v.get<e_JsonType::FloatingPoint>();
+        {
+            char buf[std::numeric_limits<double>::max_digits10 + 1];
+            double d = v.get<e_JsonType::FloatingPoint>();
+            std::snprintf(buf, std::numeric_limits<double>::max_digits10 + 1, "%f", d);
+            o << buf;
         break;
+        }
     case e_JsonType::True:
         ostream_write(o, "true");
         break;
@@ -376,27 +377,38 @@ inline void write(std::ostream& o, const T& val)
 } //impl
 
 
-void write(std::ostream& o, const Object& object)
+void write(std::ostream& o, const Value& val)
 {
-    impl::write<0>(o, object);
+    switch (val.type())
+    {
+    case e_JsonType::Object:
+        impl::write<0>(o, val.get<e_JsonType::Object>());
+        break;
+    case e_JsonType::Array:
+        impl::write<0>(o, val.get<e_JsonType::Array>());
+        break;
+    default:
+        impl::write_simple_value(o, val);
+        break;
+    }
+    
 }
-
-void write(std::ostream& o, const Array& array)
-{
-    impl::write<0>(o, array);
-}
-
 
 template <unsigned int IndentWidth>
-void write_pretty(std::ostream& o, const Object& object)
+void write_pretty(std::ostream& o, const Value& val)
 {
-    impl::write<IndentWidth>(o, object);
-}
-
-template <unsigned int IndentWidth>
-void write_pretty(std::ostream& o, const Array& array)
-{
-    impl::write<IndentWidth>(o, array);
+    switch (val.type())
+    {
+    case e_JsonType::Object:
+        impl::write<IndentWidth>(o, val.get<e_JsonType::Object>());
+        break;
+    case e_JsonType::Array:
+        impl::write<IndentWidth>(o, val.get<e_JsonType::Array>());
+        break;
+    default:
+        impl::write_simple_value(o, val);
+        break;
+    }
 }
 
 } //json
