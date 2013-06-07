@@ -3,7 +3,7 @@ CC = clang
 CXXFLAGS = -c -std=c++11 -stdlib=libc++ -Wall
 LINKFLAGS = -stdlib=libc++
 
-SOURCES = json_value.cc json_parser.cc json_writer.cc
+SOURCES = json_value.cc json_parser.cc
 
 SHARED_LIB = $(CXX) -shared -dynamiclib $(LINKFLAGS)
 STATIC_LIB = libtool -static
@@ -28,8 +28,8 @@ debug: debugdir debug_build
 release: releasedir release_build
 
 debug_build: CXXFLAGS += -g
-debug_build: $(call PathTransform,SOURCES,debug) debug/json_debug.o
-	$(STATIC_LIB) $(call PathTransform,SOURCES,debug) debug/json_debug.o -o debug/libjsond.a
+debug_build: $(call PathTransform,SOURCES,debug)
+	$(STATIC_LIB) $(call PathTransform,SOURCES,debug) -o debug/libjsond.a
 
 release_build: CXXFLAGS += -O4 -flto
 release_build: $(call PathTransform,SOURCES,release)
@@ -51,4 +51,3 @@ clean:
 
 json_value.o: json_value.cc json_value.hpp json_string.hpp json_object.hpp
 json_parser.o: json_parser.cc json_parser.hpp json_value.hpp json_string.hpp json_object.hpp
-json_writer.o: json_writer.cc json_writer.hpp

@@ -51,6 +51,7 @@ class Value
     
     Value(const String& str);
 
+    Value(int i);
     Value(long long i);
     Value(double d);
     Value(bool b);

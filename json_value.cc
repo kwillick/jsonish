@@ -25,6 +25,8 @@ Value::Value(Array&& arr) :
 
 Value::Value(const String& str) : m_type{e_JsonType::String}, m_string{str} { }
 
+Value::Value(int i) : m_type{e_JsonType::Integer}, m_integer{i} { }
+
 Value::Value(long long i) : m_type{e_JsonType::Integer}, m_integer{i} { }
 
 Value::Value(double d) : m_type{e_JsonType::FloatingPoint}, m_floating_point{d} { }

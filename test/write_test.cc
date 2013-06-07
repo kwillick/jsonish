@@ -1,27 +1,31 @@
-#include <fstream>
+#include <iostream>
 #include <string>
 #include "../json_writer.hpp"
 
 int main(int argc, char *argv[])
 {
-    std::ofstream out(argv[1]);
+    using json::Object; 
+    using json::Array;
+    using json::Value;
 
-    using json::writer::Object; 
-    using json::writer::Array;
-    using json::writer::Value;
+    Object object{
+        { "empty", Object{
+                { "object", Object{} },
+                { "array", Array{} }
+            }
+        },
+        { "nonempty", Object{
+                { "array", Array{"string", 1, 1.2, true, false, Value{} } }
+            }
+        }
+    };
 
-    json::writer::write(out, 
-                        Object{
-                            { "empty", Object{
-                                    { "object", Object{} },
-                                    { "array", Array{} }
-                                }
-                            },
-                            { "nonempty", Object{
-                                    { "array", Array{"string", 1, 1.2, true, false, Value{} } }
-                                }
-                            }
-                        });
+    json::write(std::cout, object);
+    
+    std::cout << std::endl;
+
+    json::write_pretty(std::cout, object);
+    std::cout << std::endl;
     
     return 0;
 }

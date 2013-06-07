@@ -4,11 +4,10 @@
 #include <utility>
 #include <map>
 #include <iterator>
-#include <type_traits>
 #include <algorithm>
 #include <string>
 #include <cstring>
-#include <iostream>
+#include <initializer_list>
 
 #include "json_string.hpp"
 #include "json_value.hpp"
@@ -23,6 +22,8 @@ class Object
     typedef std::map<String, Value>::const_iterator const_iterator;
     
     Object() { }
+    Object(std::initializer_list<std::pair<const String, Value>> ilist) : m_pairs(ilist) { }
+
     ~Object() { }
 
     template <typename InputIter, typename GetFunc>
@@ -54,14 +55,17 @@ class Object
         return pos->second;
     }
 
-    iterator begin()             { return m_pairs.begin(); }
-    const_iterator begin() const { return m_pairs.cbegin(); }
+    iterator begin()              { return m_pairs.begin(); }
+    const_iterator begin() const  { return m_pairs.cbegin(); }
 
-    iterator end()               { return m_pairs.end(); }
-    const_iterator end() const   { return m_pairs.cend(); }
+    iterator end()                { return m_pairs.end(); }
+    const_iterator end() const    { return m_pairs.cend(); }
 
-    bool empty() const           { return m_pairs.empty(); }
-    std::size_t size() const     { return m_pairs.size(); }
+    const_iterator cbegin() const { return m_pairs.cbegin(); }
+    const_iterator cend() const { return m_pairs.cend(); }
+
+    bool empty() const            { return m_pairs.empty(); }
+    std::size_t size() const      { return m_pairs.size(); }
 
   private:
     std::map<String, Value> m_pairs;

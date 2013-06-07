@@ -4,7 +4,6 @@
 #include <utility>
 #include <deque>
 #include "../json.hpp"
-#include "../json_debug.hpp"
 
 std::string red(const std::string& s);
 std::string blue(const std::string& s);
@@ -49,7 +48,9 @@ int main(int argc, char *argv[])
             }
 
             std::cout << "test " << blue("PASSED") << ", result:\n";
-            print_object(result.get<json::e_JsonType::Object>());
+            json::write_pretty(std::cout, result.get<json::e_JsonType::Object>());
+            std::cout << '\n';
+            //print_object(result.get<json::e_JsonType::Object>());
         }
         else
         {
@@ -60,7 +61,9 @@ int main(int argc, char *argv[])
             }
 
             std::cout << "test " << blue("PASSED") << ", result:\n";
-            print_array(result.get<json::e_JsonType::Array>());
+            json::write_pretty(std::cout, result.get<json::e_JsonType::Array>());
+            std::cout << '\n';
+            //print_array(result.get<json::e_JsonType::Array>());
         }
     }
     else if (expect_pass && parse_error)
