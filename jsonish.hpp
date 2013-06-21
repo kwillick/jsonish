@@ -1,17 +1,388 @@
-#ifndef JSON_WRITER_H
-#define JSON_WRITER_H
+#ifndef JSONISH_H
+#define JSONISH_H
 
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <deque>
+#include <functional>
+#include <limits>
+#include <map>
 #include <ostream>
 #include <stack>
-#include <algorithm>
-#include <iterator>
-#include <limits>
-#include <cstdio>
-#include "json_object.hpp"
-#include "json_value.hpp"
+#include <string>
+#include <vector>
 
-namespace json
+namespace jsonish
 {
+
+class String
+{
+  public:
+    String(const char* start, const char* end) : m_start(start), m_end(end) { }
+
+    template <std::size_t N>
+    String(const char (&str)[N]) : m_start(str), m_end(str + N - 1) { }
+
+    bool operator<(const String& rhs) const
+    {
+        return std::lexicographical_compare(m_start, m_end, rhs.m_start, rhs.m_end);
+    }
+
+    bool operator<(const char* rhs) const
+    {
+        return std::lexicographical_compare(m_start, m_end, rhs, rhs + std::strlen(rhs) + 1);
+    }
+
+    bool operator<(const std::string& rhs) const
+    {
+        return std::lexicographical_compare(m_start, m_end, rhs.cbegin(), rhs.cend());
+    }
+
+    std::string to_string() const { return std::string(m_start, m_end); }
+
+    const char* begin() const { return m_start; }
+    const char* end() const { return m_end; }
+    
+  private:
+    const char* m_start;
+    const char* m_end;
+};
+
+
+enum class e_JsonType
+{
+    Object = 0,
+    Array,
+    String,
+    Integer,
+    FloatingPoint,
+    True,
+    False,
+    Null
+};
+
+
+namespace impl
+{
+
+template <e_JsonType J>
+struct result_type;
+
+} //impl
+
+class Value;
+class Object;
+
+typedef std::vector<Value> Array;
+
+
+class Value
+{
+  public:
+    Value();
+
+    Value(const Object& obj);
+    Value(Object&& obj);
+    
+    Value(const Array& arr);
+    Value(Array&& arr);
+    
+    Value(const String& str);
+
+    Value(int i);
+    Value(long long i);
+    Value(double d);
+    Value(bool b);
+
+    Value(const Value& o);
+    Value(Value&& o);
+    Value& operator=(const Value& o);
+    Value& operator=(Value&& o);
+
+    ~Value();
+
+    e_JsonType type() const { return m_type; }
+
+    template <e_JsonType J>
+    typename impl::result_type<J>::type& get(typename impl::result_type<J>::type* unused = nullptr)
+    { return get_impl(unused); }
+
+    template <e_JsonType J>
+    const typename impl::result_type<J>::type&
+    get(const typename impl::result_type<J>::type* unused = nullptr) const
+    { return get_impl(unused); }
+
+  private:
+    e_JsonType m_type;
+    union
+    {
+        Object* m_object;
+        Array* m_array;
+        String m_string;
+        long long m_integer;
+        double m_floating_point;
+    };
+
+    void copy_guts(const Value& o);
+    void move_guts(Value&& o);
+    
+
+#define GET_IMPL(t, n)                                          \
+    inline t& get_impl(t*) { return n; }                        \
+    inline const t& get_impl(const t*) const { return n; }
+
+    GET_IMPL(Object,    *m_object)
+    GET_IMPL(Array,     *m_array)
+    GET_IMPL(String,    m_string)
+    GET_IMPL(long long, m_integer)
+    GET_IMPL(double,    m_floating_point)
+
+#undef GET_IMPL
+};
+
+
+class Object
+{
+  public:
+    typedef std::map<String, Value>::iterator       iterator;
+    typedef std::map<String, Value>::const_iterator const_iterator;
+    
+    Object() { }
+    Object(std::initializer_list<std::pair<const String, Value>> ilist) : m_pairs(ilist) { }
+
+    ~Object() { }
+
+    template <typename InputIter, typename GetFunc>
+    void move_assign(InputIter start, InputIter end, GetFunc f);
+
+    Value& operator[](const char* str)
+    {
+        return m_pairs[String(str, str + std::strlen(str))];
+    }
+
+    const Value& operator[](const char* str) const
+    {
+        String key{str, str + std::strlen(str)};
+        auto pos = m_pairs.find(key);
+        return pos->second;
+    }
+
+    Value& operator[](const std::string& str)
+    {
+        auto start = &str[0];
+        return m_pairs[String(start, start + str.length())];
+    }
+
+    const Value& operator[](const std::string& str) const
+    {
+        auto start = &str[0];
+        String key{start, start + str.length()};
+        auto pos = m_pairs.find(key);
+        return pos->second;
+    }
+
+    iterator begin()              { return m_pairs.begin(); }
+    const_iterator begin() const  { return m_pairs.cbegin(); }
+
+    iterator end()                { return m_pairs.end(); }
+    const_iterator end() const    { return m_pairs.cend(); }
+
+    const_iterator cbegin() const { return m_pairs.cbegin(); }
+    const_iterator cend() const { return m_pairs.cend(); }
+
+    bool empty() const            { return m_pairs.empty(); }
+    std::size_t size() const      { return m_pairs.size(); }
+
+  private:
+    std::map<String, Value> m_pairs;
+};
+
+
+//Value impl details
+namespace impl
+{
+
+#define RESULT_IMPL(e, t) template <> struct result_type<e> { typedef t type; }
+
+RESULT_IMPL(e_JsonType::Object,        Object);
+RESULT_IMPL(e_JsonType::Array,         Array);
+RESULT_IMPL(e_JsonType::String,        String);
+RESULT_IMPL(e_JsonType::Integer,       long long);
+RESULT_IMPL(e_JsonType::FloatingPoint, double);
+
+#undef RESULT_IMPL
+
+} //impl
+
+//Object impl details
+template <typename InputIter, typename GetFunc>
+void Object::move_assign(InputIter start, InputIter end, GetFunc f)
+{
+    //iterator expects (value, key)
+    m_pairs.clear();
+    
+    for (; start != end; ++start)
+    {
+        Value first{ std::forward<Value>(f(*start++)) };
+        Value second{ std::forward<Value>(f(*start)) };
+
+        m_pairs.emplace(second.get<e_JsonType::String>(), first);
+    }
+}
+
+
+enum class e_Token : uint8_t
+{
+    LeftBrace = 0,
+    RightBrace,
+    LeftBracket,
+    RightBracket,
+    Colon,
+    Comma,
+    String,
+    Integer,
+    Float,
+    True,
+    False,
+    Null,
+    EndOfInput,
+    Error
+};
+
+class Lexer
+{
+  public:
+    struct TokenValue
+    {
+        const char* start;
+        const char* end;
+    };
+
+    struct TokenError
+    {
+        const char* pos;
+        const char* message;
+    };
+    
+    struct Token
+    {     
+        e_Token type;
+        union
+        {
+            TokenValue value;
+            TokenError error;
+        };
+
+        Token() : type(e_Token::Error), value{ nullptr, nullptr } { }
+        
+        Token(e_Token t, const char* s, const char* e) : type(t), value{ s, e }
+        {
+        }
+
+        Token(const char* s, const char* e) : type(e_Token::Error), error{ s, e }
+        {
+        }
+    };
+
+    Lexer() = delete;
+
+    Lexer(const char* start, const char* end);
+
+    Token next();
+    Token peek();
+
+  private:
+    const char* m_pos;
+    const char* m_end;
+
+    Token read_string();
+    Token read_number();
+    Token read_potential_true();
+    Token read_potential_false();
+    Token read_potential_null();
+};
+
+struct Error
+{
+    const char* pos;
+    const char* message;
+    Error() : pos(nullptr), message(nullptr) { }
+    Error(const char* p, const char* m) : pos(p), message(m) { }
+};
+
+class Parser
+{
+  public:
+    Parser() = delete;
+
+    Parser(const char* input);
+    Parser(const char* start, const char* end);
+    Parser(const std::string& input);
+
+    void reset();
+    void reset(const char* input);
+    void reset(const char* start, const char* end);
+    void reset(const std::string& input);
+
+    Value parse(std::function<void(const Error&)> error_fun);
+
+  private:
+    const char* m_start;
+    const char* m_end;
+    Lexer m_lexer;
+
+    enum class e_Expect : uint8_t
+    {
+        Value = 0,
+        ValueOrClose,
+        CommaOrClose,
+        StringOrClose,
+        String,
+        Colon,
+        EndOfInput
+    };
+    e_Expect m_expect;
+    
+    enum class e_Context : uint8_t
+    {
+        None,
+        Object,
+        Array
+    };
+    e_Context m_context;
+
+    unsigned int m_length;
+
+    struct stack_state
+    {
+        Value value;
+        e_Context context;
+        unsigned int length;
+
+        stack_state(Value&& v, e_Context c, unsigned int l) 
+            : value(std::forward<Value>(v)), context(c), length(l) { }
+    };
+
+    std::deque<stack_state> m_stack;
+
+    unsigned int top_type() const;
+    void check_expect(const Lexer::Token& token) const;
+    void push(const Lexer::Token& token);
+    void pop(const Lexer::Token& token);
+    void pop_until_object(const Lexer::Token& token);
+    void pop_until_array(const Lexer::Token& token);
+    void comma_colon(const Lexer::Token& token);
+    void error(const Lexer::Token& token);
+
+    long long parse_integer(const Lexer::Token& token);
+    double parse_float(const Lexer::Token& token);
+
+    Value done(const Lexer::Token& token);
+};
+
+
+//output
 
 void write(std::ostream& o, const Value& val);
 
@@ -376,24 +747,6 @@ inline void write(std::ostream& o, const T& val)
 
 } //impl
 
-
-void write(std::ostream& o, const Value& val)
-{
-    switch (val.type())
-    {
-    case e_JsonType::Object:
-        impl::write<0>(o, val.get<e_JsonType::Object>());
-        break;
-    case e_JsonType::Array:
-        impl::write<0>(o, val.get<e_JsonType::Array>());
-        break;
-    default:
-        impl::write_simple_value(o, val);
-        break;
-    }
-    
-}
-
 template <unsigned int IndentWidth>
 void write_pretty(std::ostream& o, const Value& val)
 {
@@ -411,6 +764,6 @@ void write_pretty(std::ostream& o, const Value& val)
     }
 }
 
-} //json
+} //jsonish
 
-#endif //JSON_WRITER_H
+#endif //JSONISH_H

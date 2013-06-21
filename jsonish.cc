@@ -1,19 +1,123 @@
-#include "json_parser.hpp"
-#include <cstring>
+#include "jsonish.hpp"
 #include <cctype>
-#include <cstdint>
-#include <cstdlib>
 #include <cerrno>
 #include <climits>
+#include <cmath>
+#include <cstdlib>
 #include <iterator>
 #include <type_traits>
-#include <cmath>
-#include <algorithm>
-#include "json_object.hpp"
+#include <utility>
 
-
-namespace json
+namespace jsonish
 {
+
+Value::Value() : m_type{e_JsonType::Null} { }
+
+Value::Value(const Object& obj) : m_type{e_JsonType::Object}, m_object{new Object(obj)} { }
+
+Value::Value(Object&& obj) 
+    : m_type{e_JsonType::Object}, 
+      m_object{new Object(std::forward<Object>(obj))}
+{
+}
+
+Value::Value(const Array& arr) : m_type{e_JsonType::Array}, m_array{new Array(arr)} { }
+
+Value::Value(Array&& arr) : 
+    m_type{e_JsonType::Array},
+    m_array{new Array(std::forward<Array>(arr))}
+{
+}
+
+Value::Value(const String& str) : m_type{e_JsonType::String}, m_string{str} { }
+
+Value::Value(int i) : m_type{e_JsonType::Integer}, m_integer{i} { }
+
+Value::Value(long long i) : m_type{e_JsonType::Integer}, m_integer{i} { }
+
+Value::Value(double d) : m_type{e_JsonType::FloatingPoint}, m_floating_point{d} { }
+
+Value::Value(bool b) : m_type{b ? e_JsonType::True : e_JsonType::False} { }
+
+void Value::copy_guts(const Value& o)
+{
+    switch (m_type)
+    {
+    case e_JsonType::Object:
+        m_object = new Object(*o.m_object);
+        break;
+    case e_JsonType::Array:
+        m_array = new Array(*o.m_array);
+        break;
+    case e_JsonType::String:
+        new (&m_string) String(o.m_string);
+        break;
+    case e_JsonType::Integer:
+        m_integer = o.m_integer;
+        break;
+    case e_JsonType::FloatingPoint:
+        m_floating_point = o.m_floating_point;
+        break;
+    default:
+        break;
+    }
+}
+
+void Value::move_guts(Value&& o)
+{
+    switch (m_type)
+    {
+    case e_JsonType::Object:
+        m_object = o.m_object;
+        o.m_object = nullptr;
+        break;
+    case e_JsonType::Array:
+        m_array = o.m_array;
+        o.m_array = nullptr;
+        break;
+    case e_JsonType::String:
+        new (&m_string) String(std::move(o.m_string));
+        break;
+    case e_JsonType::Integer:
+        m_integer = o.m_integer;
+        break;
+    case e_JsonType::FloatingPoint:
+        m_floating_point = o.m_floating_point;
+        break;
+    default:
+        break;
+    }
+    //invalidate old value
+    o.m_type = e_JsonType::Null;
+}
+
+Value::Value(const Value& o) : m_type(o.m_type) { copy_guts(o); }
+Value::Value(Value&& o) : m_type(o.m_type) { move_guts(std::forward<Value>(o)); }
+
+Value& Value::operator=(const Value& o)
+{
+    if (this != &o)
+        copy_guts(o);
+    return *this;
+}
+
+Value& Value::operator=(Value&& o)
+{
+    m_type = o.m_type;
+    move_guts(std::forward<Value>(o));
+    return *this;
+}
+
+Value::~Value()
+{
+    switch (m_type)
+    {
+    case e_JsonType::Object: delete m_object;       break;
+    case e_JsonType::Array:  delete m_array;        break;
+    default:                                        break;
+    }
+}
+
 
 template <typename T>
 constexpr typename std::underlying_type<T>::type enum_value(T val)
@@ -573,7 +677,10 @@ unsigned int Parser::top_type() const
     return static_cast<unsigned int>(top.value.type()) + 1;
 }
 
-static inline bool _token_is_value(const Lexer::Token& token)
+namespace impl
+{
+
+static inline bool token_is_value(const Lexer::Token& token)
 {
     return (token.type == e_Token::LeftBrace   ||
             token.type == e_Token::LeftBracket ||
@@ -585,16 +692,18 @@ static inline bool _token_is_value(const Lexer::Token& token)
             token.type == e_Token::Null);
 }
 
+} //impl
+
 void Parser::check_expect(const Lexer::Token& token) const
 {
     switch (m_expect)
     {
     case e_Expect::Value:
-        if (!_token_is_value(token))
+        if (!impl::token_is_value(token))
             throw Error(token.value.start, s_parse_errors[enum_value(e_ParseError::ExpectedValue)]);
         break;
     case e_Expect::ValueOrClose:
-        if (!_token_is_value(token) && 
+        if (!impl::token_is_value(token) && 
             token.type != e_Token::RightBrace &&
             token.type != e_Token::RightBracket)
         {
@@ -751,6 +860,9 @@ void Parser::pop_until_object(const Lexer::Token& token)
     m_length = it->length + 1;
 }
 
+namespace impl
+{
+
 template <typename InputIter, typename OutputIter, typename UnaryOp>
 static inline OutputIter move_transform(InputIter start, InputIter end, OutputIter out, UnaryOp op)
 {
@@ -759,6 +871,8 @@ static inline OutputIter move_transform(InputIter start, InputIter end, OutputIt
         *out++ = std::forward<value_type>(op(*start++));
     return out;
 }
+
+} //impl
 
 void Parser::pop_until_array(const Lexer::Token& token)
 {
@@ -775,10 +889,10 @@ void Parser::pop_until_array(const Lexer::Token& token)
         reverse_iter_type rstart{ start };
         reverse_iter_type rit{ it };
 
-        move_transform(rit, rstart, array.begin(),
-                       [](stack_state& v) -> Value&& {
-                           return std::move(v.value);
-                       });
+        impl::move_transform(rit, rstart, array.begin(),
+                             [](stack_state& v) -> Value&& {
+                                 return std::move(v.value);
+                             });
 
         m_stack.erase(start, it);
     }
@@ -883,4 +997,22 @@ Value Parser::done(const Lexer::Token& token)
     return result;
 }
 
-} //json
+
+void write(std::ostream& o, const Value& val)
+{
+    switch (val.type())
+    {
+    case e_JsonType::Object:
+        impl::write<0>(o, val.get<e_JsonType::Object>());
+        break;
+    case e_JsonType::Array:
+        impl::write<0>(o, val.get<e_JsonType::Array>());
+        break;
+    default:
+        impl::write_simple_value(o, val);
+        break;
+    }
+    
+}
+
+} //jsonish

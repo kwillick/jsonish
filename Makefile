@@ -3,7 +3,7 @@ CC = clang
 CXXFLAGS = -c -std=c++11 -stdlib=libc++ -Wall
 LINKFLAGS = -stdlib=libc++
 
-SOURCES = json_value.cc json_parser.cc
+SOURCES = jsonish.cc
 
 SHARED_LIB = $(CXX) -shared -dynamiclib $(LINKFLAGS)
 STATIC_LIB = libtool -static
@@ -49,5 +49,4 @@ clean:
 	rm -rf debug release test/tester.o test/tester
 
 
-json_value.o: json_value.cc json_value.hpp json_string.hpp json_object.hpp
-json_parser.o: json_parser.cc json_parser.hpp json_value.hpp json_string.hpp json_object.hpp
+jsonish.o: jsonish.cc jsonish.hpp

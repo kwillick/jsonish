@@ -2,7 +2,7 @@
 #include <string>
 #include <iostream>
 #include <utility>
-#include "../json.hpp"
+#include "../jsonish.hpp"
 
 std::string red(const std::string& s);
 std::string blue(const std::string& s);
@@ -27,39 +27,39 @@ int main(int argc, char *argv[])
     
     std::cout << "test: " << filename << " expected " << (expect_pass ? "pass" : "fail") << "\n";
 
-    json::Parser parser{text};
+    jsonish::Parser parser{text};
     bool parse_error = false;
-    json::Error error;
-    json::Value result = parser.parse([&parse_error,&error](const json::Error& err)
-                                      {
-                                          error = err;
-                                          parse_error = true;
-                                      });
+    jsonish::Error error;
+    jsonish::Value result = parser.parse([&parse_error,&error](const jsonish::Error& err)
+                                         {
+                                             error = err;
+                                             parse_error = true;
+                                         });
 
     if (expect_pass && !parse_error)
     {
         if (toplevel_object)
         {
-            if (result.type() != json::e_JsonType::Object)
+            if (result.type() != jsonish::e_JsonType::Object)
             {
                 std::cout << "test " << red("FAILED") << " expected top level object\n\n";
                 return 1;
             }
 
             std::cout << "test " << blue("PASSED") << ", result:\n";
-            json::write_pretty(std::cout, result.get<json::e_JsonType::Object>());
+            jsonish::write_pretty(std::cout, result.get<jsonish::e_JsonType::Object>());
             std::cout << '\n';
         }
         else
         {
-            if (result.type() != json::e_JsonType::Array)
+            if (result.type() != jsonish::e_JsonType::Array)
             {
                 std::cout << "test " << red("FAILED") << " expected top level array\n\n";
                 return 1;
             }
 
             std::cout << "test " << blue("PASSED") << ", result:\n";
-            json::write_pretty(std::cout, result.get<json::e_JsonType::Array>());
+            jsonish::write_pretty(std::cout, result.get<jsonish::e_JsonType::Array>());
             std::cout << '\n';
         }
     }
