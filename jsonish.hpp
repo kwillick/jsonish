@@ -171,7 +171,7 @@ class Object
     Value& operator[](const std::string& str)
     {
         auto start = &str[0];
-        return m_pairs[String(start, start + str.length())];
+        return m_pairs[String{start, start + str.length()}];
     }
 
     const Value& operator[](const std::string& str) const
@@ -182,6 +182,28 @@ class Object
         return pos->second;
     }
 
+    iterator find(const char* key)
+    {
+        return m_pairs.find(String{key, key + std::strlen(key)});
+    }
+
+    iterator find(const std::string& key)
+    {
+        auto start = &key[0];
+        return m_pairs.find(String{start, start + key.length()});
+    }
+
+    const_iterator find(const char* key) const
+    {
+        return m_pairs.find(String{key, key + std::strlen(key)});
+    }
+
+    const_iterator find(const std::string& key) const
+    {
+        auto start = &key[0];
+        return m_pairs.find(String{start, start + key.length()});
+    }
+
     iterator begin()              { return m_pairs.begin(); }
     const_iterator begin() const  { return m_pairs.cbegin(); }
 
@@ -189,7 +211,7 @@ class Object
     const_iterator end() const    { return m_pairs.cend(); }
 
     const_iterator cbegin() const { return m_pairs.cbegin(); }
-    const_iterator cend() const { return m_pairs.cend(); }
+    const_iterator cend() const   { return m_pairs.cend(); }
 
     bool empty() const            { return m_pairs.empty(); }
     std::size_t size() const      { return m_pairs.size(); }
