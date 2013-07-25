@@ -13,14 +13,14 @@ A basic example
 int main(int argc, char* argv[])
 {
     std::string json_text = /* load a json file or something */;
-    json::Parser parser{ std::begin(json_text), std::end(json_text) };
+    jsonish::Parser parser{json_text.c_str()};
 
     jsonish::Value parsed_value = parser.parse([](const jsonish::Error& error)
                                                {
                                                    /* handle the error */
                                                });
     
-    if (parsed_value.type() != json::e_JsonType::Null)
+    if (parsed_value.type() != jsonish::e_JsonType::Null)
     {
         /* do something with parsed_value */
     }
